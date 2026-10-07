@@ -32,6 +32,7 @@ import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.ERRO
 import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.WARNING;
 import static net.pcal.fastback.common.logging.UserMessage.localized;
 import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
+import static net.pcal.fastback.common.mod.UserMessageUtil.messageToText;
 import static net.pcal.fastback.common.utils.ProcessUtils.doExec;
 
 public class EnvironmentUtils {
@@ -56,7 +57,7 @@ public class EnvironmentUtils {
      */
     public static boolean isNativeOk(boolean isNativeGitEnabled, UserLogger ulog, boolean verbose) {
         if (isNativeGitEnabled) { // default is true; false is undocumented and deprecated
-            final Component notInstalled = Component.translatable("fastback.values.not-installed");
+            final Component notInstalled = messageToText(localized("fastback.values.not-installed"));
             final String gitVersion = getGitVersion();
             final String gitLfsVersion = getGitLfsVersion();
             if (verbose) {

@@ -18,11 +18,19 @@
 
 package net.pcal.fastback.common.mod;
 
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextColor;
 import net.pcal.fastback.common.logging.UserMessage;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import static java.util.Objects.requireNonNull;
 import static net.minecraft.ChatFormatting.GRAY;
 import static net.minecraft.ChatFormatting.GREEN;
 import static net.minecraft.ChatFormatting.RED;
@@ -37,11 +45,14 @@ import static net.minecraft.network.chat.Style.EMPTY;
  */
 public class UserMessageUtil {
 
+    private static final Map<String, String> DEFAULT_TRANSLATIONS = loadDefaultTranslations();
+
     public static Component messageToText(final UserMessage m) {
         final MutableComponent out;
         if (m.localized() != null) {
-            out = Component.translatable(
+            out = Component.translatableWithFallback(
                 m.localized().key(),
+                DEFAULT_TRANSLATIONS.getOrDefault(m.localized().key(), m.localized().key()),
                 messageParamsToComponentArgs(m.localized().params())
             );
         } else {
@@ -54,6 +65,16 @@ public class UserMessageUtil {
             case NATIVE_GIT -> out.setStyle(EMPTY.withColor(TextColor.fromLegacyFormat(GREEN)));
         }
         return out;
+    }
+
+    private static Map<String, String> loadDefaultTranslations() {
+        final Map<String, String> translations = new HashMap<>();
+        try (InputStream in = UserMessageUtil.class.getResourceAsStream("/assets/fastback/lang/en_us.json")) {
+            Language.loadFromJson(requireNonNull(in, "Missing default FastBack translations"), translations::put);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Unable to load default FastBack translations", e);
+        }
+        return Map.copyOf(translations);
     }
 
     private static Object[] messageParamsToComponentArgs(final Object[] params) {
