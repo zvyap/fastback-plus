@@ -126,5 +126,6 @@
   "fastback.chat.load-confirm"                  : "%s-Backup laden?",
   "fastback.chat.load-warning"                  : "Speichert die aktuelle Welt, ersetzt sie und startet den Server neu.",
   "fastback.chat.load-cancel-hint"              : "/backup cancel vor dem Herunterfahren",
-  "fastback.broadcast.done"                     : "Backup abgeschlossen: %s • Snapshot: %s • Backups insgesamt: %s"
+  "fastback.broadcast.done"                     : "Backup abgeschlossen: %s • Snapshot: %s • Backups insgesamt: %s",
+  "fastback.broadcast.done-elapsed"             : "Backup abgeschlossen. Dauer: %s (%s / %s)."
 }

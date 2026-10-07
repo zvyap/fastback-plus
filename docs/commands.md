@@ -53,16 +53,19 @@ pages stay cached for previous/next navigation. Backup creation, deletion,
 configuration changes, and server lifecycle events invalidate the cache; the
 snapshot index also refreshes after 30 seconds.
 
-Successful backups broadcast their snapshot ID, snapshot size, and total backup
-storage by default. Disable this completion notice independently of the starting
+Successful backups broadcast their elapsed time, snapshot size, and total backup
+storage by default: `Backup complete. Used 5 seconds (228 MB / 5 GB).`
+Disable this completion notice independently of the starting
 notice with `/backup set broadcast-done-enabled false`. To customize it:
 
 ```text
-/backup set broadcast-done-message Saved {snapshot}: {snapshot_size}; total {total_size}
+/backup set broadcast-done-message Backup complete. Used {elapsed} ({snapshot_size} / {total_size}).
 ```
 
-Supported placeholders are `{snapshot}`, `{snapshot_size}`, `{total_size}`,
-`{creator}`, and `{remark}`. Snapshot size is the logical size of the committed
+Supported placeholders are `{elapsed}`, `{snapshot}`, `{snapshot_size}`, `{total_size}`,
+`{creator}`, and `{remark}`. Elapsed time is the backup duration, including any
+remote push, expressed in words; it excludes the subsequent size lookup.
+Snapshot size is the logical size of the committed
 files, including the original size of Git LFS files. Total size is the physical
 storage used by the local Git repository, including its shared history and LFS
 objects. These sizes differ because backups share unchanged data. Unavailable

@@ -126,5 +126,6 @@
   "fastback.chat.load-confirm"                  : "%sバックアップを読み込みますか？",
   "fastback.chat.load-warning"                  : "現在のワールドを保存して置き換え、サーバーを再起動します。",
   "fastback.chat.load-cancel-hint"              : "停止前に /backup cancel で中止",
-  "fastback.broadcast.done"                     : "バックアップ完了: %s • スナップショット: %s • バックアップ合計: %s"
+  "fastback.broadcast.done"                     : "バックアップ完了: %s • スナップショット: %s • バックアップ合計: %s",
+  "fastback.broadcast.done-elapsed"             : "バックアップ完了。所要時間: %s (%s / %s)。"
 }

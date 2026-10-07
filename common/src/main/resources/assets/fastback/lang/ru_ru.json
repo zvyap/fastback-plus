@@ -97,5 +97,6 @@
   "fastback.chat.load-confirm"                  : "Загрузить копию (%s)?",
   "fastback.chat.load-warning"                  : "Сохранит текущий мир, заменит его и перезапустит сервер.",
   "fastback.chat.load-cancel-hint"              : "/backup cancel до остановки сервера",
-  "fastback.broadcast.done"                     : "Копирование завершено: %s • Снимок: %s • Всего копий: %s"
+  "fastback.broadcast.done"                     : "Копирование завершено: %s • Снимок: %s • Всего копий: %s",
+  "fastback.broadcast.done-elapsed"             : "Резервное копирование завершено. Затрачено %s (%s / %s)."
 }

@@ -110,5 +110,6 @@
   "fastback.chat.load-confirm"                  : "¿Cargar copia %s?",
   "fastback.chat.load-warning"                  : "Guarda el mundo actual, lo reemplaza y reinicia el servidor.",
   "fastback.chat.load-cancel-hint"              : "/backup cancel antes del apagado",
-  "fastback.broadcast.done"                     : "Copia completada: %s • Instantánea: %s • Total de copias: %s"
+  "fastback.broadcast.done"                     : "Copia completada: %s • Instantánea: %s • Total de copias: %s",
+  "fastback.broadcast.done-elapsed"             : "Copia completada. Tiempo: %s (%s / %s)."
 }

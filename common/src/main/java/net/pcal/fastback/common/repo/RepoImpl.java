@@ -37,18 +37,17 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.text.ParseException;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_ENABLED;
@@ -112,7 +111,7 @@ class RepoImpl implements Repo {
         if (!isNativeOk(this.getConfig(), ulog, false)) return;
         checkIndexLock(ulog);
         broadcastBackupNotice();
-        final long start = System.currentTimeMillis();
+        final long start = System.nanoTime();
         final SnapshotId newSid;
         try {
             newSid = CommitUtils.doCommitSnapshot(this, ulog, metadata);
@@ -138,7 +137,7 @@ class RepoImpl implements Repo {
         }
         Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
-        broadcastBackupDone(newSid, metadata);
+        broadcastBackupDone(newSid, metadata, elapsedMillis(start));
     }
 
     @Override
@@ -147,7 +146,7 @@ class RepoImpl implements Repo {
         if (!isNativeOk(this.getConfig(), ulog, false)) return;
         checkIndexLock(ulog);
         broadcastBackupNotice();
-        final long start = System.currentTimeMillis();
+        final long start = System.nanoTime();
         final SnapshotId newSid;
         try {
             newSid = CommitUtils.doCommitSnapshot(this, ulog, metadata);
@@ -159,7 +158,7 @@ class RepoImpl implements Repo {
         }
         Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
-        broadcastBackupDone(newSid, metadata);
+        broadcastBackupDone(newSid, metadata, elapsedMillis(start));
     }
 
     @Override
@@ -176,7 +175,7 @@ class RepoImpl implements Repo {
             return;
         }
         if (!isNativeOk(this.getConfig(), ulog, false)) return;
-        final long start = System.currentTimeMillis();
+        final long start = System.nanoTime();
         try {
             PushUtils.doPush(sid, this, ulog);
         } catch (IOException | ProcessException e) {
@@ -432,8 +431,7 @@ class RepoImpl implements Repo {
     }
 
     private static String getDuration(long since) {
-        final Duration d = Duration.of(System.currentTimeMillis() - since, ChronoUnit.MILLIS);
-        long seconds = d.getSeconds();
+        long seconds = TimeUnit.MILLISECONDS.toSeconds(elapsedMillis(since));
         if (seconds < 60) {
             return String.format("%ds", seconds == 0 ? 1 : seconds);
         } else {
@@ -453,9 +451,14 @@ class RepoImpl implements Repo {
         mod().sendBroadcast(m);
     }
 
+    private static long elapsedMillis(long since) {
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - since);
+    }
+
     /** Called by the backup worker after saving (and, for full backups, pushing) succeeds. */
-    private void broadcastBackupDone(SnapshotId snapshot, SnapshotMetadata metadata) {
+    private void broadcastBackupDone(SnapshotId snapshot, SnapshotMetadata metadata, long elapsedMillis) {
         if (!getConfig().getBoolean(BROADCAST_DONE_ENABLED)) return;
+        final String elapsed = BackupCompletion.elapsedText(elapsedMillis);
         final String template = getConfig().getString(BROADCAST_DONE_MESSAGE);
         String snapshotSize = "-";
         String totalSize = "-";
@@ -480,8 +483,8 @@ class RepoImpl implements Repo {
         Executor.checkCancelled();
         final UserMessage message;
         if (template == null) {
-            message = styledLocalized("fastback.broadcast.done", BROADCAST,
-                    Component.literal(snapshot.getShortName()).withStyle(AQUA),
+            message = styledLocalized("fastback.broadcast.done-elapsed", BROADCAST,
+                    Component.literal(elapsed).withStyle(AQUA),
                     Component.literal(snapshotSize).withStyle(GOLD),
                     Component.literal(totalSize).withStyle(GOLD));
         } else {
@@ -489,6 +492,7 @@ class RepoImpl implements Repo {
                     "snapshot", snapshot.getShortName(),
                     "snapshot_size", snapshotSize,
                     "total_size", totalSize,
+                    "elapsed", elapsed,
                     "remark", metadata.remark() == null || metadata.remark().isBlank() ? "-" : metadata.remark(),
                     "creator", metadata.creator() == null ? "automatic" : metadata.creator())), BROADCAST);
         }

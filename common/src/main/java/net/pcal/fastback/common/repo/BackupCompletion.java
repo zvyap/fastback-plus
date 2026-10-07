@@ -15,10 +15,12 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.apache.commons.lang3.time.DurationFormatUtils.formatDurationWords;
+
 /** Completion statistics describe the saved tree, including the file sizes recorded by Git LFS. */
 final class BackupCompletion {
 
-    private static final Pattern PLACEHOLDER = Pattern.compile("\\{(snapshot|snapshot_size|total_size|remark|creator)\\}");
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\{(snapshot|snapshot_size|total_size|remark|creator|elapsed)\\}");
     private static final Pattern LFS_OID = Pattern.compile("(?m)^oid sha256:[a-f0-9]{64}$");
     private static final Pattern LFS_SIZE = Pattern.compile("(?m)^size ([0-9]+)$");
 
@@ -61,6 +63,10 @@ final class BackupCompletion {
     /** Substitute once so remarks containing placeholder-like text are kept literally. */
     static String expand(String template, Map<String, String> values) {
         return PLACEHOLDER.matcher(template).replaceAll(match -> Matcher.quoteReplacement(values.get(match.group(1))));
+    }
+
+    static String elapsedText(long millis) {
+        return formatDurationWords(Math.max(1000, millis), true, true);
     }
 
     private BackupCompletion() {}
