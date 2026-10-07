@@ -18,25 +18,23 @@
 
 package net.pcal.fastback.common.commands;
 
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.pcal.fastback.common.logging.UserLogger;
-import net.pcal.fastback.common.logging.UserMessage;
-import net.pcal.fastback.common.repo.SnapshotId;
+import net.minecraft.network.chat.Component;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
+import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
 import static net.pcal.fastback.common.commands.Commands.FAILURE;
 import static net.pcal.fastback.common.commands.Commands.SUCCESS;
-import static net.pcal.fastback.common.commands.Commands.gitOp;
+import static net.pcal.fastback.common.commands.Commands.snapshotOp;
 import static net.pcal.fastback.common.commands.Commands.subcommandPermission;
 import static net.pcal.fastback.common.mod.Mod.mod;
 import static net.pcal.fastback.common.repo.RepoFactory.rf;
-import static net.pcal.fastback.common.utils.Executor.ExecutionLock.NONE;
+import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.ERROR;
+import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
 
 enum ListCommand implements Command {
 
@@ -49,19 +47,25 @@ enum ListCommand implements Command {
         argb.then(
                 literal(COMMAND_NAME).
                         requires(subcommandPermission(COMMAND_NAME, pf)).
-                        executes(this::execute)
+                        executes(cc -> list(cc, 1, false)).
+                        then(argument("page", IntegerArgumentType.integer(1)).
+                                executes(cc -> list(cc, IntegerArgumentType.getInteger(cc, "page"), false)))
         );
     }
 
-    private int execute(final CommandContext<CommandSourceStack> cc) {
+    static int list(final CommandContext<CommandSourceStack> cc, int page, boolean remote) {
         try (final UserLogger ulog = UserLogger.ulog(cc)) {
             if (!rf().doInitCheck(mod().getWorldDirectory(), ulog)) return FAILURE;
-            gitOp(NONE, ulog, repo -> {
-                final List<SnapshotId> snapshots = new ArrayList<>(repo.getLocalSnapshots());
-                Collections.sort(snapshots);
-                for (final SnapshotId sid : snapshots) {
-                    ulog.message(UserMessage.raw(sid.getShortName()));
+            snapshotOp(remote, ulog, snapshots -> {
+                final int maximumPage = SnapshotList.pageCount(snapshots.size());
+                if (page > maximumPage) {
+                    ulog.message(styledLocalized("fastback.chat.list-invalid-page", ERROR, page, maximumPage));
+                    return;
                 }
+                final Component text = SnapshotList.render(snapshots, page, remote);
+                cc.getSource().getServer().execute(() -> {
+                    if (cc.getSource().getServer().isRunning()) cc.getSource().sendSuccess(() -> text, false);
+                });
             });
         }
         return SUCCESS;

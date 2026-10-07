@@ -18,23 +18,13 @@
 
 package net.pcal.fastback.common.commands;
 
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
-import net.pcal.fastback.common.logging.UserLogger;
-import net.pcal.fastback.common.logging.UserMessage;
-import net.pcal.fastback.common.repo.SnapshotId;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
+import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
-import static net.pcal.fastback.common.commands.Commands.SUCCESS;
-import static net.pcal.fastback.common.commands.Commands.gitOp;
 import static net.pcal.fastback.common.commands.Commands.subcommandPermission;
-import static net.pcal.fastback.common.config.OtherConfigKey.REMOTE_PUSH_URL;
-import static net.pcal.fastback.common.utils.Executor.ExecutionLock.NONE;
 
 enum RemoteListCommand implements Command {
 
@@ -47,18 +37,10 @@ enum RemoteListCommand implements Command {
         argb.then(
                 literal(COMMAND_NAME).
                         requires(subcommandPermission(COMMAND_NAME, pf)).
-                        executes(RemoteListCommand::execute)
+                        executes(cc -> ListCommand.list(cc, 1, true)).
+                        then(argument("page", IntegerArgumentType.integer(1)).
+                                executes(cc -> ListCommand.list(cc, IntegerArgumentType.getInteger(cc, "page"), true)))
         );
     }
 
-    private static int execute(final CommandContext<CommandSourceStack> cc) {
-        final UserLogger log = UserLogger.ulog(cc);
-        gitOp(NONE, log, repo -> {
-            final List<SnapshotId> snapshots = new ArrayList<>(repo.getRemoteSnapshots());
-            Collections.sort(snapshots);
-            snapshots.forEach(sid -> log.message(UserMessage.raw(sid.getShortName())));
-            log.message(UserMessage.localized("fastback.chat.remote-list-done", snapshots.size(), repo.getConfig().getString(REMOTE_PUSH_URL)));
-        });
-        return SUCCESS;
-    }
 }

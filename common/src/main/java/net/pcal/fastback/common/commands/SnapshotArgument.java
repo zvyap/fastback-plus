@@ -33,15 +33,22 @@ final class SnapshotArgument {
     }
 
     static Component tooltip(SnapshotDetails details, boolean remote) {
+        return messageToText(localized("fastback.chat.view-date", DateTimeFormatter.ISO_INSTANT.format(details.id().getDate().toInstant()))).copy()
+                .append("\n").append(messageToText(localized("fastback.chat.view-created-by", creatorText(details))))
+                .append("\n").append(messageToText(localized("fastback.chat.view-remark", remarkText(details, remote))));
+    }
+
+    static Component creatorText(SnapshotDetails details) {
         final SnapshotMetadata metadata = details.metadata();
-        final Component creator = metadata == null ? messageToText(localized("fastback.values.unknown"))
+        return metadata == null ? messageToText(localized("fastback.values.unknown"))
                 : metadata.creator() == null ? messageToText(localized("fastback.values.automatic"))
                 : Component.literal(metadata.creator());
-        final Component remark = metadata == null && remote ? messageToText(localized("fastback.values.unknown"))
+    }
+
+    static Component remarkText(SnapshotDetails details, boolean remote) {
+        final SnapshotMetadata metadata = details.metadata();
+        return metadata == null && remote ? messageToText(localized("fastback.values.unknown"))
                 : metadata == null || metadata.remark() == null || metadata.remark().isEmpty()
                 ? messageToText(localized("fastback.values.no-remark")) : Component.literal(metadata.remark());
-        return messageToText(localized("fastback.chat.view-date", DateTimeFormatter.ISO_INSTANT.format(details.id().getDate().toInstant()))).copy()
-                .append("\n").append(messageToText(localized("fastback.chat.view-created-by", creator)))
-                .append("\n").append(messageToText(localized("fastback.chat.view-remark", remark)));
     }
 }

@@ -4,12 +4,13 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
-/** Shares snapshot listings across commands without opening Git on every keystroke. */
+/** Shares snapshot listings across commands without opening Git for warm requests. */
 public final class SnapshotSuggestionsCache {
 
     private static final SnapshotSuggestionsCache SHARED = new SnapshotSuggestionsCache(System::nanoTime);
@@ -50,21 +51,34 @@ public final class SnapshotSuggestionsCache {
         final long now = clock.getAsLong();
         final Entry cached = entries.get(key);
         if (cached != null && now - cached.created() < TTL_NANOS) return cached.snapshots();
-        if (cached != null) cached.snapshots().complete(List.of());
+        if (cached != null) discard(cached);
         final Entry entry = new Entry(now, new CompletableFuture<>());
         entries.put(key, entry);
         try {
-            loader.get().orTimeout(5, TimeUnit.SECONDS).thenApply(List::copyOf).whenComplete((snapshots, failure) -> {
+            final CompletableFuture<List<SnapshotDetails>> loading = loader.get();
+            entry.snapshots().whenComplete((snapshots, failure) -> {
+                if (failure != null) {
+                    synchronized (SnapshotSuggestionsCache.this) {
+                        entries.remove(key, entry);
+                    }
+                    loading.cancel(true);
+                }
+            });
+            loading.orTimeout(5, TimeUnit.SECONDS).thenApply(List::copyOf).whenComplete((snapshots, failure) -> {
                 synchronized (SnapshotSuggestionsCache.this) {
-                    if (failure != null) entries.remove(key, entry);
-                    final List<SnapshotDetails> result = failure == null && entries.get(key) == entry
-                            ? snapshots : List.of();
-                    entry.snapshots().complete(result);
+                    if (failure != null) {
+                        entries.remove(key, entry);
+                        entry.snapshots().completeExceptionally(failure);
+                    } else if (entries.get(key) == entry) {
+                        entry.snapshots().complete(snapshots);
+                    } else {
+                        discard(entry);
+                    }
                 }
             });
         } catch (Exception failure) {
             entries.remove(key, entry);
-            entry.snapshots().complete(List.of());
+            entry.snapshots().completeExceptionally(failure);
         }
         return entry.snapshots();
     }
@@ -80,12 +94,16 @@ public final class SnapshotSuggestionsCache {
                 removed.add(entry.getValue());
             }
         }
-        removed.forEach(entry -> entry.snapshots().complete(List.of()));
+        removed.forEach(SnapshotSuggestionsCache::discard);
     }
 
     synchronized void reset() {
         final List<Entry> old = List.copyOf(entries.values());
         entries.clear();
-        old.forEach(entry -> entry.snapshots().complete(List.of()));
+        old.forEach(SnapshotSuggestionsCache::discard);
+    }
+
+    private static void discard(Entry entry) {
+        entry.snapshots().completeExceptionally(new CancellationException("Snapshot listing invalidated"));
     }
 }

@@ -27,14 +27,13 @@ import net.pcal.fastback.common.repo.SnapshotDetails;
 
 import static net.minecraft.commands.Commands.literal;
 import static net.pcal.fastback.common.commands.Commands.SUCCESS;
-import static net.pcal.fastback.common.commands.Commands.gitOp;
+import static net.pcal.fastback.common.commands.Commands.snapshotOp;
 import static net.pcal.fastback.common.commands.Commands.missingArgument;
 import static net.pcal.fastback.common.commands.Commands.subcommandPermission;
 import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.ERROR;
 import static net.pcal.fastback.common.logging.UserMessage.localized;
 import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
 import static net.pcal.fastback.common.mod.UserMessageUtil.messageToText;
-import static net.pcal.fastback.common.utils.Executor.ExecutionLock.NONE;
 
 enum ViewCommand implements Command {
 
@@ -54,15 +53,18 @@ enum ViewCommand implements Command {
     private static int view(CommandContext<CommandSourceStack> cc) {
         try (final UserLogger ulog = UserLogger.ulog(cc)) {
             final String snapshot = StringArgumentType.getString(cc, ARGUMENT);
-            gitOp(NONE, ulog, repo -> {
-                final SnapshotDetails details = repo.getSnapshotDetails(snapshot);
+            snapshotOp(false, ulog, snapshots -> {
+                final SnapshotDetails details = snapshots.stream()
+                        .filter(item -> item.id().getShortName().equals(snapshot)).findFirst().orElse(null);
                 if (details == null) {
                     ulog.message(styledLocalized("fastback.chat.restore-nosuch", ERROR, snapshot));
                     return;
                 }
                 final Component text = messageToText(localized("fastback.chat.view-id", details.id().getShortName())).copy()
                         .append("\n").append(SnapshotArgument.detailsText(details));
-                cc.getSource().getServer().execute(() -> cc.getSource().sendSuccess(() -> text, false));
+                cc.getSource().getServer().execute(() -> {
+                    if (cc.getSource().getServer().isRunning()) cc.getSource().sendSuccess(() -> text, false);
+                });
             });
         }
         return SUCCESS;

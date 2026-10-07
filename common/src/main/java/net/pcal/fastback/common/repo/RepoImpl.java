@@ -279,10 +279,12 @@ class RepoImpl implements Repo {
 
     @Override
     public List<SnapshotDetails> getLocalSnapshotDetails() throws IOException {
+        Executor.checkCancelled();
         final List<SnapshotId> snapshots = getLocalSnapshots().stream().sorted(Comparator.reverseOrder()).toList();
         final List<SnapshotDetails> details = new ArrayList<>(snapshots.size());
         try (final RevWalk walk = new RevWalk(jgit.getRepository())) {
             for (final SnapshotId snapshot : snapshots) {
+                Executor.checkCancelled();
                 final SnapshotDetails detail = readSnapshotDetails(snapshot, walk);
                 if (detail != null) details.add(detail);
             }

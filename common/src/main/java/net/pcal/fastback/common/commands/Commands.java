@@ -25,12 +25,18 @@ import net.pcal.fastback.common.config.GitConfig;
 import net.pcal.fastback.common.logging.UserLogger;
 import net.pcal.fastback.common.repo.Repo;
 import net.pcal.fastback.common.repo.RepoFactory;
+import net.pcal.fastback.common.repo.SnapshotDetails;
+import net.pcal.fastback.common.repo.SnapshotListings;
 import net.pcal.fastback.common.repo.SnapshotMetadata;
 import net.pcal.fastback.common.repo.SnapshotSuggestionsCache;
 import net.pcal.fastback.common.utils.Executor.ExecutionLock;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import static net.minecraft.commands.Commands.literal;
@@ -134,6 +140,32 @@ public class Commands {
 
     interface GitOp {
         void execute(Repo repo) throws Exception;
+    }
+
+    static void snapshotOp(boolean remote, UserLogger log, Consumer<List<SnapshotDetails>> operation) {
+        try {
+            SnapshotListings.get(mod().getWorldDirectory(), remote).whenComplete((snapshots, failure) -> {
+                if (failure == null) {
+                    try {
+                        operation.accept(snapshots);
+                    } catch (Exception e) {
+                        log.internalError(e);
+                    }
+                    return;
+                }
+                while (failure instanceof CompletionException && failure.getCause() != null) failure = failure.getCause();
+                if (failure instanceof SnapshotListings.Unavailable unavailable) {
+                    log.message(unavailable.message());
+                } else if (failure instanceof CancellationException || failure instanceof TimeoutException) {
+                    log.message(styledLocalized("fastback.chat.list-refresh-failed", ERROR));
+                } else {
+                    log.message(styledLocalized("fastback.chat.internal-error", ERROR));
+                    syslog().error(failure);
+                }
+            });
+        } catch (Exception e) {
+            log.internalError(e);
+        }
     }
 
     static void gitOp(final ExecutionLock lock, final UserLogger ulog, final GitOp op) {

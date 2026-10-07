@@ -30,3 +30,18 @@ autocomplete tooltips show the date and time (UTC), creator, and remark when you
 select or hover over a suggestion.
 Remote suggestions use metadata from snapshots also stored locally; remote-only
 snapshots show an unknown creator and remark.
+
+`/backup list [page]` lists local snapshots, newest first, with up to eight entries
+per page. The page defaults to 1. The title shows the total number of snapshots,
+and the footer shows the current page and maximum page. Click `<<<` or `>>>` in
+chat to go to the previous or next page, or enter a page directly:
+
+```text
+/backup list 2
+```
+
+Each entry shows its backup ID, creator (player, console, or automatic backup),
+and remark. Hover over an entry to see its full ID, date and time in UTC, creator,
+and remark; click it to copy the backup ID to your clipboard. Pages outside the
+available range are rejected. `/backup remote-list [page]` uses the same controls;
+remote-only snapshots display an unknown creator and remark.

@@ -11,13 +11,13 @@
 | `cancel`                          | Cancel an ongoing backup or snapshot load before the server starts stopping.             |
 | `delete`                          | Delete an individual snapshot.                                                           |
 | `info`                            | Info about current backup state and settings.                                            |
-| `list`                            | List backup snapshots for this world.                                                    |
+| `list [page]`                     | List local snapshots, newest first, eight per page. Click arrows to change pages or an entry to copy its backup ID. |
 | `push`    _NEW_!                  | Push a snapshot to the remote.                                                           |
 | `prune`                           | Delete old snapshots according to the retention policy.                                  |
 | `gc`                              | Run garbage collection to free up disk space.                                            |
 | `create-file-remote`              | Create a remote backup target on the file system.                                        |
 | `remote-delete`                   | Delete a remote snapshot.                                                                |
-| `remote-list`                     | List remote snapshots.                                                                   |
+| `remote-list [page]`              | List remote snapshots with the same pagination, metadata, and copy actions as `list`.    |
 | `remote-prune`                    | Delete old snapshots from the remote backup according to the remote retention policy.    |
 | `remote-restore`                  | Restore a remote snapshot.                                                               |
 | `remote-load <snapshot>`          | Show a remote snapshot's details and a clickable confirmation; loads and restarts the dedicated server after a countdown. |
