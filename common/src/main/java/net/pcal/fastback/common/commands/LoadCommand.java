@@ -8,22 +8,25 @@ import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.pcal.fastback.common.logging.UserLogger;
 import net.pcal.fastback.common.repo.SnapshotId;
+import net.pcal.fastback.common.repo.SnapshotDetails;
+import net.pcal.fastback.common.repo.SnapshotListings;
 
-import java.text.ParseException;
-import java.time.format.DateTimeFormatter;
 import java.util.Set;
 
 import static net.minecraft.ChatFormatting.GREEN;
+import static net.minecraft.ChatFormatting.GOLD;
+import static net.minecraft.ChatFormatting.GRAY;
+import static net.minecraft.ChatFormatting.RED;
 import static net.minecraft.commands.Commands.literal;
 import static net.pcal.fastback.common.commands.Commands.SUCCESS;
 import static net.pcal.fastback.common.commands.Commands.gitOp;
+import static net.pcal.fastback.common.commands.Commands.snapshotOp;
 import static net.pcal.fastback.common.commands.Commands.subcommandPermission;
 import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.ERROR;
-import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.WARNING;
 import static net.pcal.fastback.common.logging.UserMessage.localized;
 import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
 import static net.pcal.fastback.common.mod.UserMessageUtil.messageToText;
-import static net.pcal.fastback.common.utils.Executor.ExecutionLock.NONE;
+import static net.pcal.fastback.common.mod.Mod.mod;
 import static net.pcal.fastback.common.utils.Executor.ExecutionLock.WRITE;
 
 /** Loads a snapshot into a dedicated server's world after a clean shutdown and restarts it. */
@@ -53,21 +56,15 @@ enum LoadCommand implements Command {
         final UserLogger ulog = UserLogger.ulog(context);
         final CommandSourceStack source = context.getSource();
         final String snapshot = StringArgumentType.getString(context, "snapshot");
-        gitOp(NONE, ulog, repo -> {
-            final SnapshotId requested;
-            try {
-                requested = repo.createSnapshotId(snapshot);
-            } catch (ParseException e) {
+        snapshotOp(SnapshotListings.details(mod().getWorldDirectory(), remote, snapshot), ulog, details -> {
+            if (details == null) {
                 source.getServer().execute(() -> ulog.message(styledLocalized("fastback.chat.restore-nosuch", ERROR, snapshot)));
                 return;
             }
-            final SnapshotId existing = findSnapshot(requested, remote ? repo.getRemoteSnapshots() : repo.getLocalSnapshots());
-            if (existing == null) {
-                source.getServer().execute(() -> ulog.message(styledLocalized("fastback.chat.restore-nosuch", ERROR, snapshot)));
-                return;
-            }
-            final Component details = confirmation(existing);
-            source.getServer().execute(() -> source.sendSuccess(() -> details, false));
+            final Component text = confirmation(details);
+            source.getServer().execute(() -> {
+                if (source.getServer().isRunning()) source.sendSuccess(() -> text, false);
+            });
         });
         return SUCCESS;
     }
@@ -76,15 +73,19 @@ enum LoadCommand implements Command {
         return snapshots.stream().filter(sid -> sid.getBranchName().equals(requested.getBranchName())).findFirst().orElse(null);
     }
 
-    Component confirmation(SnapshotId snapshot) {
+    Component confirmation(SnapshotDetails details) {
+        final SnapshotId snapshot = details.id();
         final String confirmCommand = "/backup " + commandName + " " + StringArgumentType.escapeIfRequired(snapshot.getShortName()) + " confirm";
         final Component button = messageToText(localized("fastback.chat.load-confirm-button")).copy()
-                .withStyle(style -> style.withColor(GREEN).withUnderlined(true)
+                .withStyle(style -> style.withColor(GREEN).withBold(true).withUnderlined(true)
                         .withClickEvent(new ClickEvent.RunCommand(confirmCommand)));
-        return messageToText(styledLocalized("fastback.chat.load-confirm", WARNING,
-                snapshot.getShortName(), DateTimeFormatter.ISO_INSTANT.format(snapshot.getDate().toInstant()),
-                snapshot.getWorldId().toString(), messageToText(localized(remote ? "fastback.values.remote" : "fastback.values.local")),
-                confirmCommand)).copy().append("\n").append(button);
+        return Component.empty().append(messageToText(localized("fastback.chat.load-confirm",
+                messageToText(localized(remote ? "fastback.values.remote" : "fastback.values.local"))))
+                .copy().withStyle(GOLD).withStyle(style -> style.withBold(true)))
+                .append("\n").append(SnapshotPresentation.details(details, remote))
+                .append("\n  ").append(messageToText(localized("fastback.chat.load-warning")).copy().withStyle(RED))
+                .append("\n  ").append(button).append("  ")
+                .append(messageToText(localized("fastback.chat.load-cancel-hint")).copy().withStyle(GRAY));
     }
 
     private int load(CommandContext<CommandSourceStack> context) {

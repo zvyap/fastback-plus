@@ -97,7 +97,7 @@ abstract class CommitUtils {
             Executor.checkCancelled();
             throw new IOException(e);
         } finally {
-            SnapshotSuggestionsCache.invalidate(repo.getWorkTree().toPath());
+            SnapshotCache.invalidate(repo.getWorkTree().toPath());
         }
         Executor.checkCancelled();
         syslog().debug("Local backup complete.");

@@ -54,13 +54,13 @@ abstract class SnapshotIdUtils {
             @Override
             SnapshotId create(final WorldId wid) {
                 final Date date = new Date();
-                final String shortName = DATE_FORMAT.format(date);
+                final String shortName = THREAD_DATE_FORMAT.get().format(date);
                 return new SnapshotIdImpl(wid, date, shortName, getBranchName(wid, shortName));
             }
 
             @Override
             SnapshotId create(final WorldId wid, String shortName) throws ParseException {
-                return new SnapshotIdImpl(wid, DATE_FORMAT.parse(shortName), shortName, getBranchName(wid, shortName));
+                return new SnapshotIdImpl(wid, THREAD_DATE_FORMAT.get().parse(shortName), shortName, getBranchName(wid, shortName));
             }
 
             @Override
@@ -75,8 +75,8 @@ abstract class SnapshotIdUtils {
                     throw new ParseException("Wrong number of segments" + rawBranchName, segments.length);
                 }
                 final WorldId worldId = new WorldIdImpl(segments[0]);
-                final Date date = DATE_FORMAT.parse(segments[1]);
-                final String shortName = DATE_FORMAT.format(date);
+                final Date date = THREAD_DATE_FORMAT.get().parse(segments[1]);
+                final String shortName = THREAD_DATE_FORMAT.get().format(date);
                 return new SnapshotIdImpl(worldId, date, shortName, rawBranchName);
             }
 
@@ -94,14 +94,14 @@ abstract class SnapshotIdUtils {
             @Override
             SnapshotId create(WorldId wid) {
                 final Date date = new Date();
-                final String shortName = DATE_FORMAT.format(date);
+                final String shortName = THREAD_DATE_FORMAT.get().format(date);
                 return new SnapshotIdImpl(wid, date, shortName, getBranchName(wid, shortName));
             }
 
 
             @Override
             SnapshotId create(WorldId wid, String shortName) throws ParseException {
-                return new SnapshotIdImpl(wid, DATE_FORMAT.parse(shortName), shortName, getBranchName(wid, shortName));
+                return new SnapshotIdImpl(wid, THREAD_DATE_FORMAT.get().parse(shortName), shortName, getBranchName(wid, shortName));
             }
 
             @Override
@@ -120,8 +120,8 @@ abstract class SnapshotIdUtils {
                     throw new ParseException("too few segments " + rawBranchName, segments.length);
                 }
                 final WorldId worldUuid = new WorldIdImpl(segments[1]);
-                final Date date = DATE_FORMAT.parse(segments[2]);
-                final String shortName = DATE_FORMAT.format(date);
+                final Date date = THREAD_DATE_FORMAT.get().parse(segments[2]);
+                final String shortName = THREAD_DATE_FORMAT.get().format(date);
                 return new SnapshotIdImpl(worldUuid, date, shortName, rawBranchName);
             }
 
@@ -132,6 +132,8 @@ abstract class SnapshotIdUtils {
 
 
         static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
+        // Preserve the server timezone and parsing behaviour while isolating concurrent Git readers.
+        private static final ThreadLocal<DateFormat> THREAD_DATE_FORMAT = ThreadLocal.withInitial(() -> (DateFormat) DATE_FORMAT.clone());
 
         abstract SnapshotId create(WorldId wid);
 

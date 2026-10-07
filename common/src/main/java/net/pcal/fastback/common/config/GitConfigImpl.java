@@ -18,10 +18,12 @@
 
 package net.pcal.fastback.common.config;
 
+import net.pcal.fastback.common.repo.SnapshotCache;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.StoredConfig;
 
 import java.io.IOException;
+import java.nio.file.Path;
 
 import static java.util.Objects.requireNonNull;
 
@@ -33,13 +35,20 @@ import static java.util.Objects.requireNonNull;
 class GitConfigImpl implements GitConfig {
 
     static GitConfig load(final Git jgit) {
-        return new GitConfigImpl(jgit.getRepository().getConfig());
+        return new GitConfigImpl(jgit.getRepository().getConfig(),
+                jgit.getRepository().isBare() ? null : jgit.getRepository().getWorkTree().toPath());
     }
 
     public final StoredConfig storedConfig;
+    private final Path world;
 
     GitConfigImpl(StoredConfig jgitConfig) {
+        this(jgitConfig, null);
+    }
+
+    private GitConfigImpl(StoredConfig jgitConfig, Path world) {
         this.storedConfig = requireNonNull(jgitConfig);
+        this.world = world;
     }
 
     @Override
@@ -118,6 +127,7 @@ class GitConfigImpl implements GitConfig {
         @Override
         public void save() throws IOException {
             storedConfig.save();
+            if (world != null) SnapshotCache.invalidate(world);
         }
     }
 }

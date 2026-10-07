@@ -29,6 +29,8 @@ public enum FastbackConfigKey implements GitConfigKey {
     AUTOBACK_WAIT_MINUTES("autoback-wait", 0),
     BROADCAST_ENABLED("broadcast-enabled", true),
     BROADCAST_MESSAGE("broadcast-message", null),
+    BROADCAST_DONE_ENABLED("broadcast-done-enabled", true),
+    BROADCAST_DONE_MESSAGE("broadcast-done-message", null),
     IS_BACKUP_ENABLED("backup-enabled", true),
     IS_BRANCH_CLEANUP_ENABLED(true),
     IS_FILE_REMOTE_BARE(true),

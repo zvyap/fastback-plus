@@ -50,6 +50,8 @@ import static net.pcal.fastback.common.config.FastbackConfigKey.AUTOBACK_ACTION;
 import static net.pcal.fastback.common.config.FastbackConfigKey.AUTOBACK_WAIT_MINUTES;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_MESSAGE;
+import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_DONE_ENABLED;
+import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_DONE_MESSAGE;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_BACKUP_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_LOCK_CLEANUP_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_MODS_BACKUP_ENABLED;
@@ -91,6 +93,8 @@ enum SetCommand implements Command {
         registerBooleanConfigValue(IS_MODS_BACKUP_ENABLED, sc);
         registerBooleanConfigValue(BROADCAST_ENABLED, sc);
         registerStringConfigValue(BROADCAST_MESSAGE, "message", sc);
+        registerBooleanConfigValue(BROADCAST_DONE_ENABLED, sc);
+        registerStringConfigValue(BROADCAST_DONE_MESSAGE, "message", sc);
         registerStringConfigValue(RESTORE_DIRECTORY, "full-directory-path", sc);
         registerStringConfigValue(REMOTE_PUSH_URL, "url", sc);
         registerIntegerConfigValue(AUTOBACK_WAIT_MINUTES, "minutes", sc);

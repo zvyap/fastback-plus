@@ -22,12 +22,13 @@ spaces. Remarks support multiple languages and emoji, with a maximum length of
 /backup full 更新前のバックアップ 🚀
 ```
 
-Use `/backup view <backup-id>` to see a local snapshot's ID, date and time in UTC,
+Use `/backup view <backup-id>` to see a local snapshot's ID, date and time in the server's local time zone,
 who created it, and its remark. The creator is the player, console, or automatic
 backup; older snapshots without this metadata display an unknown creator.
-Snapshots without a remark display that no remark is available. Backup ID
-autocomplete tooltips show the date and time (UTC), creator, and remark when you
-select or hover over a suggestion.
+Snapshots without a remark display `-`. Backup ID autocomplete tooltips show
+colored date, creator, and remark fields on one line. Dates use
+`yyyy-MM-dd HH:mm:ss` followed by the server's time zone. Suggestions show up to
+100 matching backup IDs, newest first; enter a longer prefix to find an older ID.
 Remote suggestions use metadata from snapshots also stored locally; remote-only
 snapshots show an unknown creator and remark.
 
@@ -40,8 +41,29 @@ chat to go to the previous or next page, or enter a page directly:
 /backup list 2
 ```
 
-Each entry shows its backup ID, creator (player, console, or automatic backup),
-and remark. Hover over an entry to see its full ID, date and time in UTC, creator,
+The column header labels the backup ID, creator (player, console, or automatic backup),
+and remark. Hover over an entry to see its full ID, server-local date and time, creator,
 and remark; click it to copy the backup ID to your clipboard. Pages outside the
 available range are rejected. `/backup remote-list [page]` uses the same controls;
 remote-only snapshots display an unknown creator and remark.
+
+Snapshot commands share a central cache. The list loads metadata for the shown
+page, then warms the next page asynchronously. The first page and neighboring
+pages stay cached for previous/next navigation. Backup creation, deletion,
+configuration changes, and server lifecycle events invalidate the cache; the
+snapshot index also refreshes after 30 seconds.
+
+Successful backups broadcast their snapshot ID, snapshot size, and total backup
+storage by default. Disable this completion notice independently of the starting
+notice with `/backup set broadcast-done-enabled false`. To customize it:
+
+```text
+/backup set broadcast-done-message Saved {snapshot}: {snapshot_size}; total {total_size}
+```
+
+Supported placeholders are `{snapshot}`, `{snapshot_size}`, `{total_size}`,
+`{creator}`, and `{remark}`. Snapshot size is the logical size of the committed
+files, including the original size of Git LFS files. Total size is the physical
+storage used by the local Git repository, including its shared history and LFS
+objects. These sizes differ because backups share unchanged data. Unavailable
+sizes display `-`; a size lookup failure does not fail a completed backup.

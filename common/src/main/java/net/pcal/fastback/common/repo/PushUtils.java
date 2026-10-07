@@ -34,6 +34,7 @@ import org.eclipse.jgit.merge.ContentMergeStrategy;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.TrackingRefUpdate;
 import org.eclipse.jgit.transport.URIish;
 
@@ -150,12 +151,25 @@ abstract class PushUtils {
         syslog().debug("End native_push");
     }
 
-    private static void jgit_doPush(final Git jgit, final String branchNameToPush, final GitConfig conf, final UserLogger ulog) throws GitAPIException {
+    private static void jgit_doPush(final Git jgit, final String branchNameToPush, final GitConfig conf, final UserLogger ulog) throws GitAPIException, IOException {
         final ProgressMonitor pm = new JGitIncrementalProgressMonitor(new JGitPushProgressMonitor(ulog), 100);
         final String remoteName = conf.getString(REMOTE_NAME);
         syslog().info("Doing simple push of " + branchNameToPush);
-        jgit.push().setProgressMonitor(pm).setRemote(remoteName).
-                setRefSpecs(new RefSpec(branchNameToPush + ":" + branchNameToPush)).call();
+        checkPushResults(jgit.push().setProgressMonitor(pm).setRemote(remoteName).
+                setRefSpecs(new RefSpec(branchNameToPush + ":" + branchNameToPush)).call());
+    }
+
+    static void checkPushResults(Iterable<PushResult> results) throws IOException {
+        boolean updated = false;
+        for (PushResult result : results) {
+            for (RemoteRefUpdate update : result.getRemoteUpdates()) {
+                updated = true;
+                if (update.getStatus() != RemoteRefUpdate.Status.OK && update.getStatus() != RemoteRefUpdate.Status.UP_TO_DATE) {
+                    throw new IOException("Remote rejected " + update.getRemoteName() + ": " + update.getStatus());
+                }
+            }
+        }
+        if (!updated) throw new IOException("Remote did not report any snapshot ref updates");
     }
 
     static Collection<String> native_lsRemote(final Path worktree, final String remoteName) throws ProcessException {
@@ -244,6 +258,7 @@ abstract class PushUtils {
             final Iterable<PushResult> pushResult = jgit.push().setProgressMonitor(pm).setRemote(remoteName).
                     setRefSpecs(new RefSpec(tempBranchName + ":" + tempBranchName),
                             new RefSpec(branchNameToPush + ":" + branchNameToPush)).call();
+            checkPushResults(pushResult);
             syslog().debug("Cleaning up branches...");
             if (conf.getBoolean(IS_TRACKING_BRANCH_CLEANUP_ENABLED)) {
                 for (final PushResult pr : pushResult) {

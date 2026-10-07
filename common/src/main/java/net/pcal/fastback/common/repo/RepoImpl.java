@@ -18,6 +18,7 @@
 
 package net.pcal.fastback.common.repo;
 
+import net.minecraft.network.chat.Component;
 import net.pcal.fastback.common.config.GitConfig;
 import net.pcal.fastback.common.logging.UserLogger;
 import net.pcal.fastback.common.logging.UserMessage;
@@ -46,11 +47,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_MESSAGE;
+import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_DONE_ENABLED;
+import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_DONE_MESSAGE;
+import static net.minecraft.ChatFormatting.AQUA;
+import static net.minecraft.ChatFormatting.GOLD;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_LOCK_CLEANUP_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_NATIVE_GIT_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.REMOTE_NAME;
@@ -67,6 +73,8 @@ import static net.pcal.fastback.common.repo.PushUtils.jgit_lsRemote;
 import static net.pcal.fastback.common.repo.PushUtils.native_lsRemote;
 import static net.pcal.fastback.common.utils.EnvironmentUtils.isNativeOk;
 import static org.eclipse.jgit.util.FileUtils.RETRY;
+import static org.apache.commons.io.FileUtils.byteCountToDisplaySize;
+import static org.apache.commons.io.FileUtils.sizeOfDirectory;
 
 /**
  * @author pcal
@@ -115,6 +123,10 @@ class RepoImpl implements Repo {
             return;
         }
         try {
+            if (!getConfig().isSet(REMOTE_PUSH_URL)) {
+                ulog.message(styledLocalized("fastback.chat.remote-no-url", ERROR));
+                return;
+            }
             PushUtils.doPush(newSid, this, ulog);
         } catch (IOException | ProcessException e) {
             Executor.checkCancelled();
@@ -122,10 +134,11 @@ class RepoImpl implements Repo {
             syslog().error(e);
             return;
         } finally {
-            invalidateSuggestions();
+            invalidateSnapshots();
         }
         Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
+        broadcastBackupDone(newSid, metadata);
     }
 
     @Override
@@ -146,6 +159,7 @@ class RepoImpl implements Repo {
         }
         Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
+        broadcastBackupDone(newSid, metadata);
     }
 
     @Override
@@ -171,7 +185,7 @@ class RepoImpl implements Repo {
             syslog().error(e);
             return;
         } finally {
-            invalidateSuggestions();
+            invalidateSnapshots();
         }
         Executor.checkCancelled();
         ulog.message(UserMessage.localized("fastback.chat.push-done-elapsed", sid.getShortName(), getDuration(start)));
@@ -183,7 +197,7 @@ class RepoImpl implements Repo {
         try {
             return PruneUtils.doLocalPrune(this, ulog);
         } finally {
-            invalidateSuggestions();
+            invalidateSnapshots();
         }
     }
 
@@ -192,7 +206,7 @@ class RepoImpl implements Repo {
         try {
             return PruneUtils.doRemotePrune(this, ulog);
         } finally {
-            invalidateSuggestions();
+            invalidateSnapshots();
         }
     }
 
@@ -218,7 +232,7 @@ class RepoImpl implements Repo {
         try {
             RestoreUtils.doRestoreRemoteSnapshot(snapshotName, this, ulog);
         } finally {
-            invalidateSuggestions();
+            invalidateSnapshots();
         }
     }
 
@@ -227,7 +241,7 @@ class RepoImpl implements Repo {
         try {
             RestoreUtils.doLoadSnapshot(snapshotName, remote, this, ulog);
         } finally {
-            invalidateSuggestions();
+            invalidateSnapshots();
         }
     }
 
@@ -281,12 +295,18 @@ class RepoImpl implements Repo {
     public List<SnapshotDetails> getLocalSnapshotDetails() throws IOException {
         Executor.checkCancelled();
         final List<SnapshotId> snapshots = getLocalSnapshots().stream().sorted(Comparator.reverseOrder()).toList();
+        return getSnapshotDetails(snapshots);
+    }
+
+    @Override
+    public List<SnapshotDetails> getSnapshotDetails(Collection<SnapshotId> snapshots) throws IOException {
+        Executor.checkCancelled();
         final List<SnapshotDetails> details = new ArrayList<>(snapshots.size());
         try (final RevWalk walk = new RevWalk(jgit.getRepository())) {
             for (final SnapshotId snapshot : snapshots) {
                 Executor.checkCancelled();
                 final SnapshotDetails detail = readSnapshotDetails(snapshot, walk);
-                if (detail != null) details.add(detail);
+                details.add(detail == null ? new SnapshotDetails(snapshot, null) : detail);
             }
         }
         return List.copyOf(details);
@@ -336,7 +356,7 @@ class RepoImpl implements Repo {
         try {
             PruneUtils.deleteRemoteBranch(this, remoteBranchName);
         } finally {
-            invalidateSuggestions();
+            invalidateSnapshots();
         }
     }
 
@@ -345,7 +365,7 @@ class RepoImpl implements Repo {
         try {
             PruneUtils.deleteLocalBranches(this, branchesToDelete);
         } finally {
-            invalidateSuggestions();
+            invalidateSnapshots();
         }
     }
 
@@ -377,8 +397,8 @@ class RepoImpl implements Repo {
     // ======================================================================
     // Private
 
-    private void invalidateSuggestions() {
-        SnapshotSuggestionsCache.invalidate(getWorkTree().toPath());
+    private void invalidateSnapshots() {
+        SnapshotCache.invalidate(getWorkTree().toPath());
     }
 
     private WorldIdInfo getWorldIdInfo() throws IOException {
@@ -431,5 +451,47 @@ class RepoImpl implements Repo {
             m = styledLocalized("fastback.broadcast.message", BROADCAST);
         }
         mod().sendBroadcast(m);
+    }
+
+    /** Called by the backup worker after saving (and, for full backups, pushing) succeeds. */
+    private void broadcastBackupDone(SnapshotId snapshot, SnapshotMetadata metadata) {
+        if (!getConfig().getBoolean(BROADCAST_DONE_ENABLED)) return;
+        final String template = getConfig().getString(BROADCAST_DONE_MESSAGE);
+        String snapshotSize = "-";
+        String totalSize = "-";
+        if (template == null || template.contains("{snapshot_size}")) {
+            try {
+                snapshotSize = byteCountToDisplaySize(BackupCompletion.snapshotSize(jgit.getRepository(), snapshot));
+            } catch (Exception unavailable) {
+                Executor.checkCancelled();
+                syslog().warn("Unable to calculate completed snapshot size.");
+                syslog().debug(unavailable);
+            }
+        }
+        if (template == null || template.contains("{total_size}")) {
+            try {
+                totalSize = byteCountToDisplaySize(sizeOfDirectory(getDirectory()));
+            } catch (Exception unavailable) {
+                Executor.checkCancelled();
+                syslog().warn("Unable to calculate total backup size.");
+                syslog().debug(unavailable);
+            }
+        }
+        Executor.checkCancelled();
+        final UserMessage message;
+        if (template == null) {
+            message = styledLocalized("fastback.broadcast.done", BROADCAST,
+                    Component.literal(snapshot.getShortName()).withStyle(AQUA),
+                    Component.literal(snapshotSize).withStyle(GOLD),
+                    Component.literal(totalSize).withStyle(GOLD));
+        } else {
+            message = styledRaw(BackupCompletion.expand(template, Map.of(
+                    "snapshot", snapshot.getShortName(),
+                    "snapshot_size", snapshotSize,
+                    "total_size", totalSize,
+                    "remark", metadata.remark() == null || metadata.remark().isBlank() ? "-" : metadata.remark(),
+                    "creator", metadata.creator() == null ? "automatic" : metadata.creator())), BROADCAST);
+        }
+        mod().sendBroadcast(message);
     }
 }

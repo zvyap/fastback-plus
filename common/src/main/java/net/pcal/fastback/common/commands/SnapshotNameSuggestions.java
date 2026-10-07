@@ -45,7 +45,8 @@ final class SnapshotNameSuggestions implements SuggestionProvider<CommandSourceS
                                                          SuggestionsBuilder builder) {
         try {
             final Path world = mod().getWorldDirectory();
-            return SnapshotListings.get(world, remote)
+            // ponytail: cap popup metadata work; type a narrower prefix to reach older matching IDs.
+            return SnapshotListings.suggestions(world, remote, builder.getRemainingLowerCase(), 100)
                     .thenApply(snapshots -> build(snapshots, remote, builder))
                     .exceptionally(failure -> builder.build());
         } catch (Exception unavailable) {

@@ -23,7 +23,7 @@ import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
 import net.pcal.fastback.common.logging.UserLogger;
-import net.pcal.fastback.common.repo.SnapshotDetails;
+import net.pcal.fastback.common.repo.SnapshotListings;
 
 import static net.minecraft.commands.Commands.literal;
 import static net.pcal.fastback.common.commands.Commands.SUCCESS;
@@ -31,9 +31,8 @@ import static net.pcal.fastback.common.commands.Commands.snapshotOp;
 import static net.pcal.fastback.common.commands.Commands.missingArgument;
 import static net.pcal.fastback.common.commands.Commands.subcommandPermission;
 import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.ERROR;
-import static net.pcal.fastback.common.logging.UserMessage.localized;
 import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
-import static net.pcal.fastback.common.mod.UserMessageUtil.messageToText;
+import static net.pcal.fastback.common.mod.Mod.mod;
 
 enum ViewCommand implements Command {
 
@@ -53,15 +52,12 @@ enum ViewCommand implements Command {
     private static int view(CommandContext<CommandSourceStack> cc) {
         try (final UserLogger ulog = UserLogger.ulog(cc)) {
             final String snapshot = StringArgumentType.getString(cc, ARGUMENT);
-            snapshotOp(false, ulog, snapshots -> {
-                final SnapshotDetails details = snapshots.stream()
-                        .filter(item -> item.id().getShortName().equals(snapshot)).findFirst().orElse(null);
+            snapshotOp(SnapshotListings.details(mod().getWorldDirectory(), false, snapshot), ulog, details -> {
                 if (details == null) {
                     ulog.message(styledLocalized("fastback.chat.restore-nosuch", ERROR, snapshot));
                     return;
                 }
-                final Component text = messageToText(localized("fastback.chat.view-id", details.id().getShortName())).copy()
-                        .append("\n").append(SnapshotArgument.detailsText(details));
+                final Component text = SnapshotPresentation.details(details, false);
                 cc.getSource().getServer().execute(() -> {
                     if (cc.getSource().getServer().isRunning()) cc.getSource().sendSuccess(() -> text, false);
                 });

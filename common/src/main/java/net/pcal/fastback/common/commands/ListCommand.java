@@ -24,6 +24,7 @@ import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.pcal.fastback.common.logging.UserLogger;
 import net.minecraft.network.chat.Component;
+import net.pcal.fastback.common.repo.SnapshotListings;
 
 import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
@@ -56,13 +57,13 @@ enum ListCommand implements Command {
     static int list(final CommandContext<CommandSourceStack> cc, int page, boolean remote) {
         try (final UserLogger ulog = UserLogger.ulog(cc)) {
             if (!rf().doInitCheck(mod().getWorldDirectory(), ulog)) return FAILURE;
-            snapshotOp(remote, ulog, snapshots -> {
-                final int maximumPage = SnapshotList.pageCount(snapshots.size());
+            snapshotOp(SnapshotListings.page(mod().getWorldDirectory(), remote, page), ulog, snapshots -> {
+                final int maximumPage = SnapshotList.pageCount(snapshots.total());
                 if (page > maximumPage) {
                     ulog.message(styledLocalized("fastback.chat.list-invalid-page", ERROR, page, maximumPage));
                     return;
                 }
-                final Component text = SnapshotList.render(snapshots, page, remote);
+                final Component text = SnapshotList.render(snapshots.entries(), page, snapshots.total(), remote);
                 cc.getSource().getServer().execute(() -> {
                     if (cc.getSource().getServer().isRunning()) cc.getSource().sendSuccess(() -> text, false);
                 });

@@ -43,6 +43,9 @@ public interface Repo extends AutoCloseable {
 
     List<SnapshotDetails> getLocalSnapshotDetails() throws IOException;
 
+    /** Read only the selected commits; remote-only refs have unavailable metadata. */
+    List<SnapshotDetails> getSnapshotDetails(Collection<SnapshotId> snapshots) throws IOException;
+
     /** Look up a local snapshot by its exact short name; invalid or missing names return null. */
     SnapshotDetails getSnapshotDetails(String snapshotName) throws IOException;
 

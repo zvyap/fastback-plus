@@ -5,7 +5,7 @@
 | `help`                            | Get help on commands.                                                                    |
 | `local [remark]`                  | Perform a local backup immediately, optionally with a remark.                            |
 | `full [remark]`                   | Perform a local backup followed by a remote push (if configured), optionally with a remark. |
-| `view <backup-id>`                | View a local snapshot's ID, date and time (UTC), creator, and remark.                     |
+| `view <backup-id>`                | View a local snapshot's ID, server-local date and time, creator, and remark.              |
 | `restore`                         | Restore a backup snapshot.                                                               |
 | `load <snapshot>`                 | Show a local snapshot's details and a clickable confirmation; loads and restarts the dedicated server after a countdown. |
 | `cancel`                          | Cancel an ongoing backup or snapshot load before the server starts stopping.             |
@@ -32,6 +32,8 @@
 | `set mods-backup-enabled` _NEW_!  | Whether to also backup mod jars and config files (in `.fastback/mods-backup`)            |
 | `set broadcast-enabled` _NEW_!    | Whether to send a server-wide notice when a backup is starting.                          |
 | `set broadcast-message`_NEW_!     | Customized server-wide notice message.                                                   |
+| `set broadcast-done-enabled`      | Whether to broadcast successful backup completion with size statistics. Defaults to enabled. |
+| `set broadcast-done-message`      | Customize the completion notice with snapshot and size placeholders.                     |
 | `set lock-cleanup-enabled` _NEW_! | Automatic cleanup of orphaned `index.lock` files.  Be careful!                           |
 | `set force-debug-enabled` _NEW_!  | Enable verbose debugging output to the console.  Useful if you're running into problems. |
 

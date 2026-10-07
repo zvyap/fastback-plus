@@ -25,15 +25,14 @@ import net.pcal.fastback.common.config.GitConfig;
 import net.pcal.fastback.common.logging.UserLogger;
 import net.pcal.fastback.common.repo.Repo;
 import net.pcal.fastback.common.repo.RepoFactory;
-import net.pcal.fastback.common.repo.SnapshotDetails;
 import net.pcal.fastback.common.repo.SnapshotListings;
 import net.pcal.fastback.common.repo.SnapshotMetadata;
-import net.pcal.fastback.common.repo.SnapshotSuggestionsCache;
+import net.pcal.fastback.common.repo.SnapshotCache;
 import net.pcal.fastback.common.utils.Executor.ExecutionLock;
 
 import java.nio.file.Path;
-import java.util.List;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
@@ -142,9 +141,9 @@ public class Commands {
         void execute(Repo repo) throws Exception;
     }
 
-    static void snapshotOp(boolean remote, UserLogger log, Consumer<List<SnapshotDetails>> operation) {
+    static <T> void snapshotOp(CompletableFuture<T> loading, UserLogger log, Consumer<T> operation) {
         try {
-            SnapshotListings.get(mod().getWorldDirectory(), remote).whenComplete((snapshots, failure) -> {
+            loading.whenComplete((snapshots, failure) -> {
                 if (failure == null) {
                     try {
                         operation.accept(snapshots);
@@ -194,7 +193,7 @@ public class Commands {
                     ulog.message(styledLocalized("fastback.chat.internal-error", ERROR));
                     syslog().error(e);
                 } finally {
-                    if (lock == ExecutionLock.WRITE_CONFIG) SnapshotSuggestionsCache.invalidate(worldSaveDir);
+                    if (lock == ExecutionLock.WRITE_CONFIG) SnapshotCache.invalidate(worldSaveDir);
                     mod().clearHudText();
                 }
             });

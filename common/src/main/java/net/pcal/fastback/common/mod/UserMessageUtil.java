@@ -63,6 +63,7 @@ public class UserMessageUtil {
             case WARNING -> out.setStyle(EMPTY.withColor(TextColor.fromLegacyFormat(YELLOW)));
             case JGIT -> out.setStyle(EMPTY.withColor(TextColor.fromLegacyFormat(GRAY)));
             case NATIVE_GIT -> out.setStyle(EMPTY.withColor(TextColor.fromLegacyFormat(GREEN)));
+            case BROADCAST -> out.setStyle(EMPTY.withColor(TextColor.fromLegacyFormat(GREEN)));
         }
         return out;
     }

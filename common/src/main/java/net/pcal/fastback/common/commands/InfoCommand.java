@@ -40,6 +40,8 @@ import static net.pcal.fastback.common.config.FastbackConfigKey.AUTOBACK_ACTION;
 import static net.pcal.fastback.common.config.FastbackConfigKey.AUTOBACK_WAIT_MINUTES;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_MESSAGE;
+import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_DONE_ENABLED;
+import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_DONE_MESSAGE;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_BACKUP_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_MODS_BACKUP_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.LOCAL_RETENTION_POLICY;
@@ -100,6 +102,8 @@ enum InfoCommand implements Command {
                         show(IS_MODS_BACKUP_ENABLED, conf::getBoolean, ulog);
                         show(BROADCAST_ENABLED, conf::getBoolean, ulog);
                         show(BROADCAST_MESSAGE, conf::getString, ulog);
+                        show(BROADCAST_DONE_ENABLED, conf::getBoolean, ulog);
+                        show(BROADCAST_DONE_MESSAGE, conf::getString, ulog);
 
                         final SchedulableAction shutdownAction = SchedulableAction.forConfigValue(conf.getString(SHUTDOWN_ACTION));
                         ulog.message(UserMessage.localized("fastback.chat.info-shutdown-action", getActionDisplay(shutdownAction)));

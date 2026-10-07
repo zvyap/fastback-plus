@@ -5,9 +5,12 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.pcal.fastback.common.repo.SnapshotDetails;
+import net.pcal.fastback.common.repo.SnapshotListings;
 
 import java.util.List;
 
+import static net.minecraft.ChatFormatting.BOLD;
+import static net.minecraft.ChatFormatting.DARK_GRAY;
 import static net.minecraft.ChatFormatting.GOLD;
 import static net.minecraft.ChatFormatting.GRAY;
 import static net.minecraft.ChatFormatting.GREEN;
@@ -18,44 +21,47 @@ import static net.pcal.fastback.common.mod.UserMessageUtil.messageToText;
 /** Chat presentation shared by local and remote backup lists. */
 final class SnapshotList {
 
-    static final int PAGE_SIZE = 8;
+    static final int PAGE_SIZE = SnapshotListings.PAGE_SIZE;
 
     static int pageCount(int total) {
         return total == 0 ? 1 : 1 + (total - 1) / PAGE_SIZE;
     }
 
-    /** Snapshots must already be ordered newest first by the shared cache. */
-    static Component render(List<SnapshotDetails> snapshots, int page, boolean remote) {
-        final int maxPage = pageCount(snapshots.size());
+    /** Page entries must already be ordered newest first by the shared cache. */
+    static Component render(List<SnapshotDetails> entries, int page, int total, boolean remote) {
+        final int maxPage = pageCount(total);
         if (page < 1 || page > maxPage) throw new IllegalArgumentException("Invalid backup list page: " + page);
-        final MutableComponent result = messageToText(localized(remote ? "fastback.chat.remote-list-title" : "fastback.chat.list-title", snapshots.size())).copy()
-                .withStyle(GOLD);
-        final int start = (page - 1) * PAGE_SIZE;
-        final int end = start + Math.min(PAGE_SIZE, snapshots.size() - start);
-        for (final SnapshotDetails details : snapshots.subList(start, end)) {
+        final MutableComponent result = messageToText(localized(remote ? "fastback.chat.remote-list-title" : "fastback.chat.list-title", total)).copy()
+                .withStyle(GOLD, BOLD);
+        result.append("\n  ").append(messageToText(localized("fastback.chat.list-columns")).copy()
+                .withStyle(style -> style.withColor(GRAY).withBold(false)));
+        for (final SnapshotDetails details : entries) {
             final String id = details.id().getShortName();
-            final Component hover = messageToText(localized("fastback.chat.view-id", id)).copy()
-                    .append("\n").append(SnapshotArgument.tooltip(details, remote))
-                    .append("\n").append(messageToText(localized("fastback.chat.list-copy-hint")));
-            final Component entry = messageToText(localized("fastback.chat.list-entry", id,
-                    SnapshotArgument.creatorText(details), SnapshotArgument.remarkText(details, remote))).copy()
-                    .withStyle(style -> style.withColor(YELLOW)
+            final Component hover = SnapshotPresentation.details(details, remote).copy()
+                    .append("\n\n  ").append(messageToText(localized("fastback.chat.list-copy-hint")).copy().withStyle(GREEN));
+            final Component entry = Component.literal("  ").withStyle(DARK_GRAY)
+                    .append(Component.literal(id).withStyle(YELLOW))
+                    .append(Component.literal(" | ").withStyle(DARK_GRAY))
+                    .append(SnapshotPresentation.creatorText(details))
+                    .append(Component.literal(" | ").withStyle(DARK_GRAY))
+                    .append(SnapshotPresentation.remarkText(details, remote))
+                    .withStyle(style -> style.withBold(false)
                             .withClickEvent(new ClickEvent.CopyToClipboard(id))
                             .withHoverEvent(new HoverEvent.ShowText(hover)));
             result.append("\n").append(entry);
         }
-        if (snapshots.isEmpty()) result.append("\n").append(messageToText(localized("fastback.chat.list-empty")).copy().withStyle(GRAY));
+        if (total == 0) result.append("\n  ").append(messageToText(localized("fastback.chat.list-empty")).copy().withStyle(style -> style.withColor(GRAY).withBold(false)));
         final String command = remote ? "/backup remote-list " : "/backup list ";
-        return result.append("\n")
+        return result.append("\n  ")
                 .append(navigation("fastback.chat.list-previous", command, page - 1, page > 1))
                 .append(" ")
-                .append(messageToText(localized("fastback.chat.list-page", page, maxPage)).copy().withStyle(GOLD))
+                .append(messageToText(localized("fastback.chat.list-page", page, maxPage)).copy().withStyle(style -> style.withColor(GOLD).withBold(false)))
                 .append(" ")
                 .append(navigation("fastback.chat.list-next", command, page + 1, page < maxPage));
     }
 
     private static Component navigation(String key, String command, int page, boolean enabled) {
-        final MutableComponent text = messageToText(localized(key)).copy().withStyle(enabled ? GREEN : GRAY);
+        final MutableComponent text = messageToText(localized(key)).copy().withStyle(style -> style.withColor(enabled ? GREEN : GRAY).withBold(false));
         return enabled ? text.withStyle(style -> style.withClickEvent(new ClickEvent.RunCommand(command + page))) : text;
     }
 
