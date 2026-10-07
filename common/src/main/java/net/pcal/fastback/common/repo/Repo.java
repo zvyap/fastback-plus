@@ -41,6 +41,11 @@ public interface Repo extends AutoCloseable {
 
     Set<SnapshotId> getLocalSnapshots() throws IOException;
 
+    List<SnapshotDetails> getLocalSnapshotDetails() throws IOException;
+
+    /** Look up a local snapshot by its exact short name; invalid or missing names return null. */
+    SnapshotDetails getSnapshotDetails(String snapshotName) throws IOException;
+
     Set<SnapshotId> getRemoteSnapshots() throws IOException;
 
     // ======================================================================
@@ -55,9 +60,17 @@ public interface Repo extends AutoCloseable {
     // Obviously there are still some TODOs here to align with this convention.
     //
 
-    void doCommitAndPush(UserLogger ulog) throws IOException;
+    default void doCommitAndPush(UserLogger ulog) throws IOException {
+        doCommitAndPush(ulog, SnapshotMetadata.AUTOMATIC);
+    }
 
-    void doCommitSnapshot(UserLogger ulog) throws IOException;
+    void doCommitAndPush(UserLogger ulog, SnapshotMetadata metadata) throws IOException;
+
+    default void doCommitSnapshot(UserLogger ulog) throws IOException {
+        doCommitSnapshot(ulog, SnapshotMetadata.AUTOMATIC);
+    }
+
+    void doCommitSnapshot(UserLogger ulog, SnapshotMetadata metadata) throws IOException;
 
     Collection<SnapshotId> doLocalPrune(UserLogger ulog) throws IOException;
 

@@ -25,6 +25,8 @@ import net.pcal.fastback.common.config.GitConfig;
 import net.pcal.fastback.common.logging.UserLogger;
 import net.pcal.fastback.common.repo.Repo;
 import net.pcal.fastback.common.repo.RepoFactory;
+import net.pcal.fastback.common.repo.SnapshotMetadata;
+import net.pcal.fastback.common.repo.SnapshotSuggestionsCache;
 import net.pcal.fastback.common.utils.Executor.ExecutionLock;
 
 import java.nio.file.Path;
@@ -58,6 +60,7 @@ public class Commands {
         LocalCommand.INSTANCE.register(root, pf);
         FullCommand.INSTANCE.register(root, pf);
         InfoCommand.INSTANCE.register(root, pf);
+        ViewCommand.INSTANCE.register(root, pf);
 
         RestoreCommand.INSTANCE.register(root, pf);
         LoadCommand.LOCAL.register(root, pf);
@@ -121,6 +124,14 @@ public class Commands {
         return FAILURE;
     }
 
+    static SnapshotMetadata backupMetadata(CommandSourceStack source, String remark, UserLogger log) {
+        if (remark != null && remark.codePointCount(0, remark.length()) > SnapshotMetadata.MAX_REMARK_LENGTH) {
+            log.message(styledLocalized("fastback.chat.remark-too-long", ERROR, SnapshotMetadata.MAX_REMARK_LENGTH));
+            return null;
+        }
+        return new SnapshotMetadata(source.getTextName(), remark);
+    }
+
     interface GitOp {
         void execute(Repo repo) throws Exception;
     }
@@ -151,6 +162,7 @@ public class Commands {
                     ulog.message(styledLocalized("fastback.chat.internal-error", ERROR));
                     syslog().error(e);
                 } finally {
+                    if (lock == ExecutionLock.WRITE_CONFIG) SnapshotSuggestionsCache.invalidate(worldSaveDir);
                     mod().clearHudText();
                 }
             });

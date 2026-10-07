@@ -35,6 +35,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -64,6 +66,10 @@ import static net.pcal.fastback.common.utils.ProcessUtils.doExec;
 abstract class CommitUtils {
 
     static SnapshotId doCommitSnapshot(final RepoImpl repo, final UserLogger ulog) throws IOException, ProcessException, GitAPIException {
+        return doCommitSnapshot(repo, ulog, SnapshotMetadata.AUTOMATIC);
+    }
+
+    static SnapshotId doCommitSnapshot(final RepoImpl repo, final UserLogger ulog, final SnapshotMetadata metadata) throws IOException, ProcessException, GitAPIException {
         Executor.checkCancelled();
         PreflightUtils.doPreflight(repo);
         final WorldId uuid = repo.getWorldId();
@@ -78,17 +84,20 @@ abstract class CommitUtils {
         Executor.checkCancelled();
 
         final String newBranchName = newSid.getBranchName();
+        final String commitMessage = metadata.toCommitMessage(newBranchName);
         try {
             if (conf.getBoolean(IS_NATIVE_GIT_ENABLED)) {
                 ulog.message(styledLocalized("fastback.chat.commit-start", NATIVE_GIT, newSid.getShortName()));
-                native_commit(newBranchName, repo, ulog);
+                native_commit(newBranchName, commitMessage, repo, ulog);
             } else {
                 ulog.message(styledLocalized("fastback.chat.commit-start", NORMAL, newSid.getShortName()));
-                jgit_commit(newBranchName, repo.getJGit(), ulog);
+                jgit_commit(newBranchName, commitMessage, repo.getJGit(), ulog);
             }
         } catch (GitAPIException e) {
             Executor.checkCancelled();
             throw new IOException(e);
+        } finally {
+            SnapshotSuggestionsCache.invalidate(repo.getWorkTree().toPath());
         }
         Executor.checkCancelled();
         syslog().debug("Local backup complete.");
@@ -125,7 +134,7 @@ abstract class CommitUtils {
         }
     }
 
-    private static void native_commit(final String newBranchName, final Repo repo, final UserLogger ulog) throws ProcessException {
+    private static void native_commit(final String newBranchName, final String commitMessage, final Repo repo, final UserLogger ulog) throws ProcessException, IOException {
         syslog().debug("Start native_commit");
         ulog.update(styledLocalized("fastback.hud.local-saving", NATIVE_GIT));
         final File worktree = repo.getWorkTree();
@@ -141,12 +150,24 @@ abstract class CommitUtils {
             mod().setWorldSaveEnabled(true);
             syslog().debug("World save re-enabled.");
         }
-        String[] commit = {"git", "-C", worktree.getAbsolutePath(), "commit", "-m", newBranchName};
-        doExec(commit, env, outputConsumer, outputConsumer);
+        nativeCommitMessage(repo, commitMessage, outputConsumer);
         syslog().debug("End native_commit");
     }
 
-    private static void jgit_commit(final String newBranchName, final Git jgit, final UserLogger ulog) throws GitAPIException, IOException {
+    static void nativeCommitMessage(final Repo repo, final String commitMessage, final Consumer<String> outputConsumer) throws IOException, ProcessException {
+        // Keep the message outside the worktree index and avoid platform argument quoting of player remarks.
+        final Path messageFile = Files.createTempFile(repo.getDirectory().toPath(), "fastback-commit-", ".txt");
+        try {
+            Files.writeString(messageFile, commitMessage, StandardCharsets.UTF_8);
+            final String[] commit = {"git", "-C", repo.getWorkTree().getAbsolutePath(), "-c", "i18n.commitEncoding=UTF-8",
+                    "commit", "--cleanup=verbatim", "-F", messageFile.toAbsolutePath().toString()};
+            doExec(commit, Map.of("GIT_LFS_FORCE_PROGRESS", "1"), outputConsumer, outputConsumer);
+        } finally {
+            Files.deleteIfExists(messageFile);
+        }
+    }
+
+    private static void jgit_commit(final String newBranchName, final String commitMessage, final Git jgit, final UserLogger ulog) throws GitAPIException, IOException {
         syslog().debug("Starting jgit_commit");
         Executor.checkCancelled();
         ulog.update(styledLocalized("fastback.hud.local-saving", JGIT));
@@ -209,7 +230,7 @@ abstract class CommitUtils {
         Executor.checkCancelled();
         syslog().debug("commit");
         ulog.update(styledLocalized("fastback.chat.commit-complete", JGIT));
-        jgit.commit().setMessage(newBranchName).call();
+        jgit.commit().setMessage(commitMessage).call();
     }
 
     private static void writeBackupProperties(Repo repo) throws IOException {

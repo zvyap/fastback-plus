@@ -18,14 +18,19 @@
 
 package net.pcal.fastback.common.commands;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.pcal.fastback.common.logging.UserLogger;
+import net.pcal.fastback.common.repo.SnapshotMetadata;
 
 import java.io.IOException;
 
+import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
+import static net.pcal.fastback.common.commands.Commands.FAILURE;
 import static net.pcal.fastback.common.commands.Commands.SUCCESS;
+import static net.pcal.fastback.common.commands.Commands.backupMetadata;
 import static net.pcal.fastback.common.commands.Commands.gitOp;
 import static net.pcal.fastback.common.commands.Commands.subcommandPermission;
 import static net.pcal.fastback.common.logging.SystemLogger.syslog;
@@ -50,19 +55,28 @@ enum FullCommand implements Command {
         argb.then(
                 literal(COMMAND_NAME).
                         requires(subcommandPermission(COMMAND_NAME, pf)).
-                        executes(cc -> run(cc.getSource()))
+                        executes(cc -> run(cc.getSource(), null)).
+                        then(argument("remark", StringArgumentType.greedyString()).
+                                executes(cc -> run(cc.getSource(), StringArgumentType.getString(cc, "remark"))))
         );
     }
 
     public static int run(CommandSourceStack scs) {
+        return run(scs, null);
+    }
+
+    private static int run(CommandSourceStack scs, String remark) {
         final UserLogger ulog = ulog(scs);
+        final SnapshotMetadata metadata = backupMetadata(scs, remark, ulog);
+        if (metadata == null) return FAILURE;
         try {
             saveWorldBeforeBackup(ulog);
         } catch (IOException e) {
             ulog.internalError();
             syslog().error(e);
+            return FAILURE;
         }
-        gitOp(WRITE, ulog, repo -> repo.doCommitAndPush(ulog));
+        gitOp(WRITE, ulog, repo -> repo.doCommitAndPush(ulog, metadata));
         return SUCCESS;
     }
 

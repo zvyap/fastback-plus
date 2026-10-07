@@ -18,13 +18,17 @@
 
 package net.pcal.fastback.common.commands;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.pcal.fastback.common.logging.UserLogger;
+import net.pcal.fastback.common.repo.SnapshotMetadata;
 
+import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
 import static net.pcal.fastback.common.commands.Commands.FAILURE;
 import static net.pcal.fastback.common.commands.Commands.SUCCESS;
+import static net.pcal.fastback.common.commands.Commands.backupMetadata;
 import static net.pcal.fastback.common.commands.Commands.gitOp;
 import static net.pcal.fastback.common.commands.Commands.subcommandPermission;
 import static net.pcal.fastback.common.commands.FullCommand.saveWorldBeforeBackup;
@@ -51,20 +55,25 @@ enum LocalCommand implements Command {
         argb.then(
                 literal(COMMAND_NAME).
                         requires(subcommandPermission(COMMAND_NAME, pf)).
-                        executes(cc -> run(cc.getSource()))
+                        executes(cc -> run(cc.getSource(), null)).
+                        then(argument("remark", StringArgumentType.greedyString()).
+                                executes(cc -> run(cc.getSource(), StringArgumentType.getString(cc, "remark"))))
         );
     }
 
-    private static int run(CommandSourceStack scs) {
+    private static int run(CommandSourceStack scs, String remark) {
         try (final UserLogger ulog = ulog(scs)) {
+            final SnapshotMetadata metadata = backupMetadata(scs, remark, ulog);
+            if (metadata == null) return FAILURE;
             if (!rf().doInitCheck(mod().getWorldDirectory(), ulog)) return FAILURE;
             try {
                 saveWorldBeforeBackup(ulog);
             } catch (Exception e) {
                 ulog.internalError();
                 syslog().error(e);
+                return FAILURE;
             }
-            gitOp(WRITE, ulog, repo -> repo.doCommitSnapshot(ulog));
+            gitOp(WRITE, ulog, repo -> repo.doCommitSnapshot(ulog, metadata));
         }
         return SUCCESS;
     }

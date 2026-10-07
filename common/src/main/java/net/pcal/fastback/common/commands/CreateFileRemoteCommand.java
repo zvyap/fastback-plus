@@ -40,7 +40,7 @@ import static net.pcal.fastback.common.config.FastbackConfigKey.IS_FILE_REMOTE_B
 import static net.pcal.fastback.common.config.OtherConfigKey.REMOTE_PUSH_URL;
 import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.ERROR;
 import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
-import static net.pcal.fastback.common.utils.Executor.ExecutionLock.NONE;
+import static net.pcal.fastback.common.utils.Executor.ExecutionLock.WRITE_CONFIG;
 import static net.pcal.fastback.common.utils.FileUtils.mkdirs;
 
 enum CreateFileRemoteCommand implements Command {
@@ -64,7 +64,7 @@ enum CreateFileRemoteCommand implements Command {
 
     private static int setFileRemote(final CommandContext<CommandSourceStack> cc) {
         final UserLogger ulog = UserLogger.ulog(cc);
-        gitOp(NONE, ulog, repo -> {
+        gitOp(WRITE_CONFIG, ulog, repo -> {
             final String targetPath = cc.getArgument(ARGUMENT, String.class);
             final Path fupHome = Path.of(targetPath);
             if (fupHome.toFile().exists()) {

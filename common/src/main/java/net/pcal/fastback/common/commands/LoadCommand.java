@@ -14,7 +14,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.Set;
 
 import static net.minecraft.ChatFormatting.GREEN;
-import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
 import static net.pcal.fastback.common.commands.Commands.SUCCESS;
 import static net.pcal.fastback.common.commands.Commands.gitOp;
@@ -45,8 +44,7 @@ enum LoadCommand implements Command {
     public void register(LiteralArgumentBuilder<CommandSourceStack> root, PermissionsFactory<CommandSourceStack> pf) {
         root.then(literal(commandName)
                 .requires(subcommandPermission(commandName, pf).and(source -> source.getServer().isDedicatedServer()))
-                .then(argument("snapshot", StringArgumentType.string())
-                        .suggests(remote ? SnapshotNameSuggestions.remote() : SnapshotNameSuggestions.local())
+                .then((remote ? SnapshotArgument.remote("snapshot") : SnapshotArgument.local("snapshot"))
                         .executes(this::confirm)
                         .then(literal("confirm").executes(this::load))));
     }

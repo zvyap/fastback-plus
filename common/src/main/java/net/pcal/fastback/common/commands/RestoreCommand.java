@@ -18,13 +18,11 @@
 
 package net.pcal.fastback.common.commands;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.pcal.fastback.common.logging.UserLogger;
 
-import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
 import static net.pcal.fastback.common.commands.Commands.SUCCESS;
 import static net.pcal.fastback.common.commands.Commands.gitOp;
@@ -43,8 +41,7 @@ enum RestoreCommand implements Command {
         argb.then(
                 literal(COMMAND_NAME).
                         requires(subcommandPermission(COMMAND_NAME, pf)).then(
-                                argument(ARGUMENT, StringArgumentType.string()).
-                                        suggests(SnapshotNameSuggestions.local()).
+                                SnapshotArgument.local(ARGUMENT).
                                         executes(RestoreCommand::restore)
                         )
         );

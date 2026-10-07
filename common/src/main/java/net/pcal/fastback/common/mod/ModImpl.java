@@ -32,6 +32,7 @@ import net.pcal.fastback.common.mixins.ServerAccessors;
 import net.pcal.fastback.common.mixins.SessionAccessors;
 import net.pcal.fastback.common.repo.Repo;
 import net.pcal.fastback.common.repo.RepoFactory;
+import net.pcal.fastback.common.repo.SnapshotSuggestionsCache;
 import net.pcal.fastback.common.utils.ServerRestart;
 import net.pcal.fastback.common.utils.ServerWorldRestore;
 import org.apache.logging.log4j.LogManager;
@@ -101,6 +102,7 @@ class ModImpl implements Mod {
     @Override
     public void onWorldStart(final MinecraftServer minecraftServer) {
         this.minecraftServer = requireNonNull(minecraftServer);
+        SnapshotSuggestionsCache.clear();
         executor().start();
         syslog().debug("onWorldStart complete");
     }
@@ -158,6 +160,7 @@ class ModImpl implements Mod {
             }
             syslog().debug("onWorldStop complete");
         }
+        SnapshotSuggestionsCache.clear();
         this.minecraftServer = null;
     }
 

@@ -23,6 +23,7 @@ import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.pcal.fastback.common.logging.UserLogger;
 import net.pcal.fastback.common.repo.RepoFactory;
+import net.pcal.fastback.common.repo.SnapshotSuggestionsCache;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -63,6 +64,8 @@ enum InitCommand implements Command {
                             rf.doInit(worldSaveDir, ulog);
                         } catch (IOException e) {
                             throw new RuntimeException(e);
+                        } finally {
+                            SnapshotSuggestionsCache.invalidate(worldSaveDir);
                         }
                     }
             );

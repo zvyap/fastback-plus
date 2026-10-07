@@ -29,6 +29,7 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.FileUtils;
 
 import java.io.File;
@@ -36,8 +37,14 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.text.ParseException;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -71,6 +78,8 @@ class RepoImpl implements Repo {
     // Constants
 
     static final String FASTBACK_DIR = ".fastback";
+    private static final DateTimeFormatter SNAPSHOT_NAME_FORMAT =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd_HH-mm-ss").withResolverStyle(ResolverStyle.STRICT);
 
     // ======================================================================
     // Fields
@@ -90,14 +99,15 @@ class RepoImpl implements Repo {
     // 'do' methods - implement higher-level command-oriented logic.
 
     @Override
-    public void doCommitAndPush(final UserLogger ulog) {
+    public void doCommitAndPush(final UserLogger ulog, final SnapshotMetadata metadata) {
+        requireNonNull(metadata);
         if (!isNativeOk(this.getConfig(), ulog, false)) return;
         checkIndexLock(ulog);
         broadcastBackupNotice();
         final long start = System.currentTimeMillis();
         final SnapshotId newSid;
         try {
-            newSid = CommitUtils.doCommitSnapshot(this, ulog);
+            newSid = CommitUtils.doCommitSnapshot(this, ulog, metadata);
         } catch (IOException | GitAPIException | ProcessException e) {
             Executor.checkCancelled();
             syslog().error(e);
@@ -111,20 +121,23 @@ class RepoImpl implements Repo {
             ulog.message(styledLocalized("fastback.chat.push-failed", ERROR));
             syslog().error(e);
             return;
+        } finally {
+            invalidateSuggestions();
         }
         Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
     }
 
     @Override
-    public void doCommitSnapshot(final UserLogger ulog) {
+    public void doCommitSnapshot(final UserLogger ulog, final SnapshotMetadata metadata) {
+        requireNonNull(metadata);
         if (!isNativeOk(this.getConfig(), ulog, false)) return;
         checkIndexLock(ulog);
         broadcastBackupNotice();
         final long start = System.currentTimeMillis();
         final SnapshotId newSid;
         try {
-            newSid = CommitUtils.doCommitSnapshot(this, ulog);
+            newSid = CommitUtils.doCommitSnapshot(this, ulog, metadata);
         } catch (IOException | ProcessException | GitAPIException e) {
             Executor.checkCancelled();
             ulog.message(styledLocalized("fastback.chat.commit-failed", ERROR));
@@ -139,7 +152,7 @@ class RepoImpl implements Repo {
     public void backupBeforeLoad(UserLogger ulog) throws Exception {
         if (!isNativeOk(this.getConfig(), ulog, false)) throw new IOException("Backup tools are unavailable");
         checkIndexLock(ulog);
-        CommitUtils.doCommitSnapshot(this, ulog);
+        CommitUtils.doCommitSnapshot(this, ulog, SnapshotMetadata.AUTOMATIC);
     }
 
     @Override
@@ -157,6 +170,8 @@ class RepoImpl implements Repo {
             ulog.message(styledLocalized("fastback.chat.commit-failed", ERROR));
             syslog().error(e);
             return;
+        } finally {
+            invalidateSuggestions();
         }
         Executor.checkCancelled();
         ulog.message(UserMessage.localized("fastback.chat.push-done-elapsed", sid.getShortName(), getDuration(start)));
@@ -165,12 +180,20 @@ class RepoImpl implements Repo {
 
     @Override
     public Collection<SnapshotId> doLocalPrune(final UserLogger ulog) throws IOException {
-        return PruneUtils.doLocalPrune(this, ulog);
+        try {
+            return PruneUtils.doLocalPrune(this, ulog);
+        } finally {
+            invalidateSuggestions();
+        }
     }
 
     @Override
     public Collection<SnapshotId> doRemotePrune(final UserLogger ulog) throws IOException {
-        return PruneUtils.doRemotePrune(this, ulog);
+        try {
+            return PruneUtils.doRemotePrune(this, ulog);
+        } finally {
+            invalidateSuggestions();
+        }
     }
 
     @Override
@@ -192,12 +215,20 @@ class RepoImpl implements Repo {
 
     @Override
     public void doRestoreRemoteSnapshot(String snapshotName, UserLogger ulog) {
-        RestoreUtils.doRestoreRemoteSnapshot(snapshotName, this, ulog);
+        try {
+            RestoreUtils.doRestoreRemoteSnapshot(snapshotName, this, ulog);
+        } finally {
+            invalidateSuggestions();
+        }
     }
 
     @Override
     public void doLoadSnapshot(String snapshotName, boolean remote, UserLogger ulog) {
-        RestoreUtils.doLoadSnapshot(snapshotName, remote, this, ulog);
+        try {
+            RestoreUtils.doLoadSnapshot(snapshotName, remote, this, ulog);
+        } finally {
+            invalidateSuggestions();
+        }
     }
 
     // ======================================================================
@@ -247,6 +278,40 @@ class RepoImpl implements Repo {
     }
 
     @Override
+    public List<SnapshotDetails> getLocalSnapshotDetails() throws IOException {
+        final List<SnapshotId> snapshots = getLocalSnapshots().stream().sorted(Comparator.reverseOrder()).toList();
+        final List<SnapshotDetails> details = new ArrayList<>(snapshots.size());
+        try (final RevWalk walk = new RevWalk(jgit.getRepository())) {
+            for (final SnapshotId snapshot : snapshots) {
+                final SnapshotDetails detail = readSnapshotDetails(snapshot, walk);
+                if (detail != null) details.add(detail);
+            }
+        }
+        return List.copyOf(details);
+    }
+
+    @Override
+    public SnapshotDetails getSnapshotDetails(String snapshotName) throws IOException {
+        if (snapshotName == null) return null;
+        try {
+            LocalDateTime.parse(snapshotName, SNAPSHOT_NAME_FORMAT);
+            final SnapshotId snapshot = createSnapshotId(snapshotName);
+            try (final RevWalk walk = new RevWalk(jgit.getRepository())) {
+                return readSnapshotDetails(snapshot, walk);
+            }
+        } catch (DateTimeParseException | ParseException invalidName) {
+            return null;
+        }
+    }
+
+    private SnapshotDetails readSnapshotDetails(SnapshotId snapshot, RevWalk walk) throws IOException {
+        final Ref ref = jgit.getRepository().exactRef("refs/heads/" + snapshot.getBranchName());
+        if (ref == null || ref.getObjectId() == null) return null;
+        final String message = walk.parseCommit(ref.getObjectId()).getFullMessage();
+        return new SnapshotDetails(snapshot, SnapshotMetadata.fromCommitMessage(message));
+    }
+
+    @Override
     public GitConfig getConfig() {
         if (this.config == null) {
             this.config = GitConfig.load(this.jgit);
@@ -266,12 +331,20 @@ class RepoImpl implements Repo {
 
     @Override
     public void deleteRemoteBranch(String remoteBranchName) throws IOException {
-        PruneUtils.deleteRemoteBranch(this, remoteBranchName);
+        try {
+            PruneUtils.deleteRemoteBranch(this, remoteBranchName);
+        } finally {
+            invalidateSuggestions();
+        }
     }
 
     @Override
     public void deleteLocalBranches(final List<String> branchesToDelete) throws IOException {
-        PruneUtils.deleteLocalBranches(this, branchesToDelete);
+        try {
+            PruneUtils.deleteLocalBranches(this, branchesToDelete);
+        } finally {
+            invalidateSuggestions();
+        }
     }
 
     @Override
@@ -301,6 +374,10 @@ class RepoImpl implements Repo {
 
     // ======================================================================
     // Private
+
+    private void invalidateSuggestions() {
+        SnapshotSuggestionsCache.invalidate(getWorkTree().toPath());
+    }
 
     private WorldIdInfo getWorldIdInfo() throws IOException {
         if (this.worldIdInfo == null) {

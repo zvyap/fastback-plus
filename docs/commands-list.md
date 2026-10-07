@@ -3,8 +3,9 @@
 |-----------------------------------|------------------------------------------------------------------------------------------|
 | `init`                            | Initialize fastback for the current world.  Run this first.                              |
 | `help`                            | Get help on commands.                                                                    |
-| `local`                           | Perform a local backup immediately.                                                      |
-| `full`                            | Perform a local backup followed by a remote push (if configured).                        |
+| `local [remark]`                  | Perform a local backup immediately, optionally with a remark.                            |
+| `full [remark]`                   | Perform a local backup followed by a remote push (if configured), optionally with a remark. |
+| `view <backup-id>`                | View a local snapshot's ID, date and time (UTC), creator, and remark.                     |
 | `restore`                         | Restore a backup snapshot.                                                               |
 | `load <snapshot>`                 | Show a local snapshot's details and a clickable confirmation; loads and restarts the dedicated server after a countdown. |
 | `cancel`                          | Cancel an ongoing backup or snapshot load before the server starts stopping.             |

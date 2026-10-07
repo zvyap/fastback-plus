@@ -20,3 +20,4 @@
 * `fastback.command.remote-restore`
 * `fastback.command.restore`
 * `fastback.command.set`
+* `fastback.command.view`
