@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [
     "FileFixerUpperMixin",
+    "LevelStorageSourceMixin",
     "MinecraftServerMixin",
     "ServerAccessors",
     "SessionAccessors"

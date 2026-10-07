@@ -32,6 +32,7 @@ import net.pcal.fastback.common.mixins.ServerAccessors;
 import net.pcal.fastback.common.mixins.SessionAccessors;
 import net.pcal.fastback.common.repo.Repo;
 import net.pcal.fastback.common.repo.RepoFactory;
+import net.pcal.fastback.common.utils.ServerWorldRestore;
 import org.apache.logging.log4j.LogManager;
 import org.eclipse.jgit.transport.SshSessionFactory;
 
@@ -39,6 +40,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Map;
+import java.util.UUID;
 
 import static java.nio.file.Files.createTempDirectory;
 import static java.util.Objects.requireNonNull;
@@ -60,9 +62,13 @@ class ModImpl implements Mod {
     private final LoaderHelper loaderHelper;
     private final ClientHelper clientHelper; // null on a dedicated server
     private final Runnable autoSaveListener;
-    private MinecraftServer minecraftServer = null; // currently open world
-    private boolean isWorldSaveEnabled = true;
+    private volatile MinecraftServer minecraftServer = null; // currently open world
+    private volatile boolean isWorldSaveEnabled = true;
     private Path tempRestoresDirectory = null;
+    private volatile ServerRestoreRequest pendingRestore = null;
+
+    private record ServerRestoreRequest(Path world, Path staged, Path previous) {
+    }
 
     // ======================================================================
     // Factory — called by loader initializers
@@ -122,6 +128,21 @@ class ModImpl implements Mod {
                     syslog().error("Shutdown action failed.", e);
                 }
             }
+            final ServerRestoreRequest restore = this.pendingRestore;
+            if (restore != null) {
+                try {
+                    // Loader stopped events run after level IO closes. Release the world lock too.
+                    ((ServerAccessors) this.minecraftServer).getStorageSource().close();
+                    ServerWorldRestore.install(restore.world(), restore.staged(), restore.previous());
+                    syslog().info("Snapshot loaded. Previous world saved at " + restore.previous() +
+                            ". Restart the server to play the restored world.");
+                } catch (Exception e) {
+                    syslog().error("Snapshot installation failed. Preserved world paths: active=" + restore.world() +
+                            ", staged=" + restore.staged() + ", previous=" + restore.previous() +
+                            ". Check these paths before restarting the server.", e);
+                }
+                this.pendingRestore = null;
+            }
             syslog().debug("onWorldStop complete");
         }
         this.minecraftServer = null;
@@ -135,6 +156,37 @@ class ModImpl implements Mod {
             tempRestoresDirectory = createTempDirectory("fastback-restore");
         }
         return tempRestoresDirectory;
+    }
+
+    @Override
+    public synchronized void requestServerRestore(final Path stagedWorld) throws IOException {
+        final MinecraftServer server = this.minecraftServer;
+        if (server == null || !server.isDedicatedServer() || !server.isRunning() || this.pendingRestore != null) {
+            throw new IOException("Server is unavailable or already loading a snapshot");
+        }
+        final Path world = this.getWorldDirectory().toRealPath();
+        final Path staged = stagedWorld.toAbsolutePath().normalize();
+        final Path previous = world.resolveSibling(world.getFileName() + "-fastback-before-load-" + UUID.randomUUID());
+        ServerWorldRestore.validate(world, staged, previous);
+        final ServerRestoreRequest restore = new ServerRestoreRequest(world, staged, previous);
+        this.pendingRestore = restore;
+        syslog().info("Prepared snapshot at " + staged + ". Outgoing world will be preserved at " + previous);
+        try {
+            server.execute(() -> {
+                if (this.pendingRestore == restore) {
+                    this.sendBroadcast(localized("fastback.chat.load-stopping"));
+                    server.halt(false);
+                }
+            });
+        } catch (RuntimeException e) {
+            this.pendingRestore = null;
+            throw e;
+        }
+    }
+
+    @Override
+    public boolean isServerRestorePending() {
+        return this.pendingRestore != null;
     }
 
     @Override

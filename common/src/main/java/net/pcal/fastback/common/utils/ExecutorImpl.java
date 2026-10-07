@@ -30,6 +30,7 @@ import static java.util.Objects.requireNonNull;
 import static net.pcal.fastback.common.logging.SystemLogger.syslog;
 import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.ERROR;
 import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
+import static net.pcal.fastback.common.mod.Mod.mod;
 
 /**
  * @author pcal
@@ -45,17 +46,24 @@ class ExecutorImpl implements Executor {
     public void execute(ExecutionLock lock, UserLogger ulog, Runnable runnable) {
         requireNonNull(lock, "lock");
         if (this.executor == null) throw new IllegalStateException("Executor not started");
+        final Runnable task = () -> {
+            if (mod().isServerRestorePending()) {
+                ulog.message(styledLocalized("fastback.chat.load-pending", ERROR));
+            } else {
+                runnable.run();
+            }
+        };
         switch (lock) {
             case NONE:
             case WRITE_CONFIG: // revisit this
-                this.executor.submit(runnable);
+                this.executor.submit(task);
                 break;
             case WRITE:
                 if (this.exclusiveFuture != null && !this.exclusiveFuture.isDone()) {
                     ulog.message(styledLocalized("fastback.chat.thread-busy", ERROR));
                 } else {
                     syslog().debug("executing " + runnable);
-                    this.exclusiveFuture = this.executor.submit(runnable);
+                    this.exclusiveFuture = this.executor.submit(task);
                 }
                 break;
             default:
@@ -76,6 +84,9 @@ class ExecutorImpl implements Executor {
     @Override
     public void stop() {
         shutdownExecutor(this.executor);
+        if (!this.executor.isTerminated()) {
+            throw new IllegalStateException("Backup tasks did not stop; refusing to release the world");
+        }
         this.executor = null;
     }
 

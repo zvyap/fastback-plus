@@ -179,6 +179,11 @@ class RepoImpl implements Repo {
         RestoreUtils.doRestoreRemoteSnapshot(snapshotName, this, ulog);
     }
 
+    @Override
+    public void doLoadSnapshot(String snapshotName, boolean remote, UserLogger ulog) {
+        RestoreUtils.doLoadSnapshot(snapshotName, remote, this, ulog);
+    }
+
     // ======================================================================
     // Other repo implementation
 

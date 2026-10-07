@@ -119,6 +119,12 @@ public interface Mod {
      */
     Path getDefaultRestoresDir() throws IOException;
 
+    /** Schedule a prepared snapshot for installation after a dedicated server stops. */
+    void requestServerRestore(Path stagedWorld) throws IOException;
+
+    /** Whether the server is stopping to load a prepared snapshot. */
+    boolean isServerRestorePending();
+
     /**
      * @return the version of the fastback mod.
      */

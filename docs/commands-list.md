@@ -6,6 +6,7 @@
 | `local`                           | Perform a local backup immediately.                                                      |
 | `full`                            | Perform a local backup followed by a remote push (if configured).                        |
 | `restore`                         | Restore a backup snapshot.                                                               |
+| `load <snapshot> confirm`         | Load a local snapshot into the dedicated server world; stops the server for restart.     |
 | `delete`                          | Delete an individual snapshot.                                                           |
 | `info`                            | Info about current backup state and settings.                                            |
 | `list`                            | List backup snapshots for this world.                                                    |
@@ -17,6 +18,7 @@
 | `remote-list`                     | List remote snapshots.                                                                   |
 | `remote-prune`                    | Delete old snapshots from the remote backup according to the remote retention policy.    |
 | `remote-restore`                  | Restore a remote snapshot.                                                               |
+| `remote-load <snapshot> confirm`  | Load a remote snapshot into the dedicated server world; stops the server for restart.    |
 | `set retention-policy`            | Set retention policy for local snapshots.                                                |
 | `set remote-url`                  | Set the url for remote backups.                                                          |
 | `set shutdown-action`             | Set an action to perform on shutdown.                                                    |

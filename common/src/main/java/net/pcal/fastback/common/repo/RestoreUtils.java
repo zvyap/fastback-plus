@@ -18,17 +18,21 @@
 
 package net.pcal.fastback.common.repo;
 
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.NbtIo;
 import net.pcal.fastback.common.config.GitConfig;
 import net.pcal.fastback.common.logging.UserLogger;
 import net.pcal.fastback.common.logging.UserMessage.UserMessageStyle;
 import net.pcal.fastback.common.utils.FileUtils;
 import net.pcal.fastback.common.utils.ProcessException;
 import net.pcal.fastback.common.utils.ProcessUtils;
+import net.pcal.fastback.common.utils.ServerWorldRestore;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ProgressMonitor;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -71,6 +75,50 @@ abstract class RestoreUtils {
         }
     }
 
+    static void doLoadSnapshot(final String snapshotName, final boolean remote, final RepoImpl repo, final UserLogger ulog) {
+        Path stagedWorld = null;
+        boolean scheduled = false;
+        try {
+            PreflightUtils.doPreflight(repo);
+            final GitConfig conf = repo.getConfig();
+            if (remote && !conf.isSet(REMOTE_PUSH_URL)) {
+                ulog.message(styledLocalized("fastback.chat.remote-no-url", ERROR));
+                return;
+            }
+            final SnapshotId sid = repo.createSnapshotId(snapshotName);
+            final Path world = mod().getWorldDirectory().toRealPath();
+            final String repoUri = remote ? conf.getString(REMOTE_PUSH_URL) : world.toUri().toString();
+            // A sibling keeps installation on the same filesystem, regardless of restore-directory.
+            stagedWorld = Files.createTempDirectory(world.getParent(), ".fastback-load-");
+            ulog.message(localized("fastback.chat.load-preparing", sid.getShortName()));
+            restoreSnapshot(sid.getBranchName(), stagedWorld, repoUri, conf, ulog);
+            // Keep the live repository's complete history and configuration during installation.
+            if (Files.exists(stagedWorld.resolve(".git"))) FileUtils.rmdir(stagedWorld.resolve(".git"));
+            ServerWorldRestore.validateSnapshot(stagedWorld);
+            if (NbtIo.readCompressed(stagedWorld.resolve("level.dat"), NbtAccounter.create(64L * 1024 * 1024))
+                    .getCompoundOrEmpty("Data").isEmpty()) {
+                throw new IOException("Restored level.dat does not contain world data");
+            }
+            if (!WorldIdUtils.getWorldIdInfo(stagedWorld).wid().equals(repo.getWorldId())) {
+                throw new IOException("Restored snapshot belongs to a different world");
+            }
+            mod().requestServerRestore(stagedWorld);
+            scheduled = true;
+            ulog.message(localized("fastback.chat.load-scheduled", sid.getShortName()));
+        } catch (Exception e) {
+            syslog().error("Server snapshot load failed before shutdown", e);
+            ulog.message(styledLocalized("fastback.chat.load-failed", ERROR));
+        } finally {
+            if (!scheduled && stagedWorld != null) {
+                try {
+                    FileUtils.rmdir(stagedWorld);
+                } catch (IOException e) {
+                    syslog().error("Could not remove incomplete staged snapshot at " + stagedWorld, e);
+                }
+            }
+        }
+    }
+
     // ======================================================================
     // Private
 
@@ -82,15 +130,20 @@ abstract class RestoreUtils {
             final Path allRestoresDir = conf.isSet(RESTORE_DIRECTORY) ?
                     Paths.get(conf.getString(RESTORE_DIRECTORY)) : mod().getDefaultRestoresDir();
             final Path restoreTargetDir = getTargetDir(allRestoresDir, mod().getWorldName(), sid.getShortName());
-            if (conf.getBoolean(IS_NATIVE_GIT_ENABLED)) {
-                native_restoreSnapshot(sid.getBranchName(), restoreTargetDir, repoUri, ulog);
-            } else {
-                jgit_restoreSnapshot(sid.getBranchName(), restoreTargetDir, repoUri, ulog);
-            }
+            restoreSnapshot(sid.getBranchName(), restoreTargetDir, repoUri, conf, ulog);
             ulog.message(localized("fastback.chat.restore-done", restoreTargetDir));
         } catch (Exception e) {
             syslog().error(e);
             ulog.message(styledRaw("Restore failed.  See log for details.", ERROR)); // FIXME i18n
+        }
+    }
+
+    private static void restoreSnapshot(final String branchName, final Path target, final String repoUri,
+                                        final GitConfig conf, final UserLogger ulog) throws IOException, GitAPIException, ProcessException {
+        if (conf.getBoolean(IS_NATIVE_GIT_ENABLED)) {
+            native_restoreSnapshot(branchName, target, repoUri, ulog);
+        } else {
+            jgit_restoreSnapshot(branchName, target, repoUri, ulog);
         }
     }
 

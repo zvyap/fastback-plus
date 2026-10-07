@@ -10,9 +10,11 @@
 * `fastback.command.info`
 * `fastback.command.list`
 * `fastback.command.local`
+* `fastback.command.load`
 * `fastback.command.prune`
 * `fastback.command.remote-delete`
 * `fastback.command.remote-list`
+* `fastback.command.remote-load`
 * `fastback.command.remote-prune`
 * `fastback.command.remote-restore`
 * `fastback.command.restore`

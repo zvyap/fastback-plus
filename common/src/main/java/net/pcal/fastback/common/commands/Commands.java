@@ -56,6 +56,8 @@ public class Commands {
         InfoCommand.INSTANCE.register(root, pf);
 
         RestoreCommand.INSTANCE.register(root, pf);
+        LoadCommand.LOCAL.register(root, pf);
+        LoadCommand.REMOTE.register(root, pf);
         CreateFileRemoteCommand.INSTANCE.register(root, pf);
 
         PruneCommand.INSTANCE.register(root, pf);

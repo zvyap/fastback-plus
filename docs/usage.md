@@ -69,3 +69,47 @@ Note that files in the current world are never touched by `restore`; the restore
 To look at the restored snapshot, quit the current world and open the restored snapshot world.  (In server mode, you'll have to manually copy
 the restored files from the location displayed at the end of the command).
 
+## Loading a snapshot on a dedicated server
+
+Operators can replace the server's active world with a local backup using:
+
+```
+/backup load 2022-10-02_10-11-12 confirm
+```
+
+For a remote backup, use `/backup remote-load <snapshot> confirm`. Both commands
+offer snapshot name completion. Omitting `confirm` displays the shutdown warning
+without changing the world.
+
+FastBack first downloads or copies the snapshot into a temporary sibling of the
+world folder and checks it. A preparation failure leaves the server running and
+the active world in place. Once the snapshot is ready, FastBack announces the
+shutdown, stops the server normally, waits for backup tasks and the configured
+shutdown action, and closes the world files before replacing the world folder.
+**Restart the server after its process has finished** to play the selected snapshot;
+FastBack does not restart the server process automatically.
+
+The outgoing world is preserved beside the active world in a folder named
+`<world-folder>-fastback-before-load-<unique-id>`. The server log prints the exact
+path before shutdown and after loading. The original Git repository, snapshot
+history, remote settings, and backup configuration remain attached to the active
+world. Files added after the selected snapshot are kept only in the outgoing copy.
+These recovery copies are not pruned automatically; remove one only after verifying
+the restored world and no longer needing the outgoing data.
+
+Loading needs enough free space beside the world for the extracted snapshot. It
+uses that location for safe directory moves, independently of `restore-directory`.
+If installation fails, FastBack attempts to put the original world back and logs
+the active, staged, and outgoing paths. Check those paths before restarting.
+If the process stops during installation or rollback fails, a sibling file named
+`<world-folder>-fastback-load-pending.txt` records those paths. FastBack refuses
+to start that world while the file exists, so an interrupted swap cannot silently
+start a fresh world. Recover the intended world and its `.git`, then remove the
+marker and restart. A successful load or rollback removes the marker automatically.
+These checks protect against interrupted processes; they do not guarantee recovery
+from power loss or storage failure.
+To return to the outgoing world manually, stop the server, preserve the currently
+active folder, move its `.git` into the outgoing folder if that folder has no
+`.git`, and put the outgoing folder back at the configured world path before
+restarting.
+
