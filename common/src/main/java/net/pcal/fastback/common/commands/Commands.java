@@ -28,14 +28,18 @@ import net.pcal.fastback.common.repo.RepoFactory;
 import net.pcal.fastback.common.utils.Executor.ExecutionLock;
 
 import java.nio.file.Path;
+import java.util.concurrent.CancellationException;
 import java.util.function.Predicate;
 
+import static net.minecraft.commands.Commands.literal;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_BACKUP_ENABLED;
 import static net.pcal.fastback.common.logging.SystemLogger.syslog;
 import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.ERROR;
+import static net.pcal.fastback.common.logging.UserMessage.localized;
 import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
 import static net.pcal.fastback.common.mod.Mod.mod;
 import static net.pcal.fastback.common.utils.EnvironmentUtils.isNativeOk;
+import static net.pcal.fastback.common.utils.Executor.checkCancelled;
 import static net.pcal.fastback.common.utils.Executor.executor;
 
 public class Commands {
@@ -58,6 +62,16 @@ public class Commands {
         RestoreCommand.INSTANCE.register(root, pf);
         LoadCommand.LOCAL.register(root, pf);
         LoadCommand.REMOTE.register(root, pf);
+        root.then(literal("cancel")
+                .requires(subcommandPermission("cancel", pf))
+                .executes(context -> {
+                    try (final UserLogger ulog = UserLogger.ulog(context)) {
+                        final boolean cancelled = executor().cancel();
+                        ulog.message(localized(cancelled
+                                ? "fastback.chat.cancel-requested" : "fastback.chat.cancel-none"));
+                        return cancelled ? SUCCESS : FAILURE;
+                    }
+                }));
         CreateFileRemoteCommand.INSTANCE.register(root, pf);
 
         PruneCommand.INSTANCE.register(root, pf);
@@ -130,7 +144,10 @@ public class Commands {
                     } else {
                         op.execute(repo);
                     }
+                } catch (CancellationException e) {
+                    throw e;
                 } catch (Exception e) {
+                    checkCancelled();
                     ulog.message(styledLocalized("fastback.chat.internal-error", ERROR));
                     syslog().error(e);
                 } finally {

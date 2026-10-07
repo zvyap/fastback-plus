@@ -24,6 +24,7 @@ import net.pcal.fastback.common.config.GitConfig;
 import net.pcal.fastback.common.logging.UserLogger;
 import net.pcal.fastback.common.logging.UserMessage.UserMessageStyle;
 import net.pcal.fastback.common.utils.FileUtils;
+import net.pcal.fastback.common.utils.LoadCountdown;
 import net.pcal.fastback.common.utils.ProcessException;
 import net.pcal.fastback.common.utils.ProcessUtils;
 import net.pcal.fastback.common.utils.ServerWorldRestore;
@@ -37,10 +38,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_NATIVE_GIT_ENABLED;
+import static net.pcal.fastback.common.config.FastbackConfigKey.LOAD_COUNTDOWN_SECONDS;
 import static net.pcal.fastback.common.config.FastbackConfigKey.RESTORE_DIRECTORY;
 import static net.pcal.fastback.common.config.OtherConfigKey.REMOTE_PUSH_URL;
 import static net.pcal.fastback.common.logging.SystemLogger.syslog;
@@ -50,6 +54,7 @@ import static net.pcal.fastback.common.logging.UserMessage.localized;
 import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
 import static net.pcal.fastback.common.logging.UserMessage.styledRaw;
 import static net.pcal.fastback.common.mod.Mod.mod;
+import static net.pcal.fastback.common.utils.Executor.checkCancelled;
 
 /**
  * Utilities for restoring a snapshot
@@ -88,24 +93,48 @@ abstract class RestoreUtils {
             final SnapshotId sid = repo.createSnapshotId(snapshotName);
             final Path world = mod().getWorldDirectory().toRealPath();
             final String repoUri = remote ? conf.getString(REMOTE_PUSH_URL) : world.toUri().toString();
+            final int countdownSeconds = conf.getInt(LOAD_COUNTDOWN_SECONDS);
+            if (countdownSeconds < 0) throw new IOException("Load countdown cannot be negative");
+            checkCancelled();
             // A sibling keeps installation on the same filesystem, regardless of restore-directory.
             stagedWorld = Files.createTempDirectory(world.getParent(), ".fastback-load-");
             ulog.message(localized("fastback.chat.load-preparing", sid.getShortName()));
-            restoreSnapshot(sid.getBranchName(), stagedWorld, repoUri, conf, ulog);
-            // Keep the live repository's complete history and configuration during installation.
-            if (Files.exists(stagedWorld.resolve(".git"))) FileUtils.rmdir(stagedWorld.resolve(".git"));
-            ServerWorldRestore.validateSnapshot(stagedWorld);
-            if (NbtIo.readCompressed(stagedWorld.resolve("level.dat"), NbtAccounter.create(64L * 1024 * 1024))
-                    .getCompoundOrEmpty("Data").isEmpty()) {
-                throw new IOException("Restored level.dat does not contain world data");
-            }
-            if (!WorldIdUtils.getWorldIdInfo(stagedWorld).wid().equals(repo.getWorldId())) {
-                throw new IOException("Restored snapshot belongs to a different world");
+            final AtomicBoolean prepared = new AtomicBoolean();
+            try (final LoadCountdown countdown = new LoadCountdown(countdownSeconds, seconds -> {
+                if (seconds > 0) {
+                    final var warning = localized("fastback.chat.load-countdown", sid.getShortName(), seconds);
+                    ulog.message(warning);
+                    mod().sendBroadcast(warning);
+                } else if (!prepared.get()) {
+                    ulog.message(localized("fastback.chat.load-waiting-preparation"));
+                }
+            })) {
+                restoreSnapshot(sid.getBranchName(), stagedWorld, repoUri, conf, ulog);
+                checkCancelled();
+                // Keep the live repository's complete history and configuration during installation.
+                if (Files.exists(stagedWorld.resolve(".git"))) FileUtils.rmdir(stagedWorld.resolve(".git"));
+                ServerWorldRestore.validateSnapshot(stagedWorld);
+                if (NbtIo.readCompressed(stagedWorld.resolve("level.dat"), NbtAccounter.create(64L * 1024 * 1024))
+                        .getCompoundOrEmpty("Data").isEmpty()) {
+                    throw new IOException("Restored level.dat does not contain world data");
+                }
+                if (!WorldIdUtils.getWorldIdInfo(stagedWorld).wid().equals(repo.getWorldId())) {
+                    throw new IOException("Restored snapshot belongs to a different world");
+                }
+                prepared.set(true);
+                countdown.await();
             }
             mod().requestServerRestore(stagedWorld);
             scheduled = true;
+            checkCancelled();
             ulog.message(localized("fastback.chat.load-scheduled", sid.getShortName()));
+        } catch (CancellationException e) {
+            throw e;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CancellationException("Snapshot load cancelled");
         } catch (Exception e) {
+            checkCancelled();
             syslog().error("Server snapshot load failed before shutdown", e);
             ulog.message(styledLocalized("fastback.chat.load-failed", ERROR));
         } finally {
@@ -132,7 +161,10 @@ abstract class RestoreUtils {
             final Path restoreTargetDir = getTargetDir(allRestoresDir, mod().getWorldName(), sid.getShortName());
             restoreSnapshot(sid.getBranchName(), restoreTargetDir, repoUri, conf, ulog);
             ulog.message(localized("fastback.chat.restore-done", restoreTargetDir));
+        } catch (CancellationException e) {
+            throw e;
         } catch (Exception e) {
+            checkCancelled();
             syslog().error(e);
             ulog.message(styledRaw("Restore failed.  See log for details.", ERROR)); // FIXME i18n
         }

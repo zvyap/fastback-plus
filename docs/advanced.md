@@ -82,6 +82,29 @@ You can configure this in `[worlddir]/.git/config`:
 	broadcast-notice-message = My custom message.
 ```
 
+### Loading a snapshot into the server
+
+Run `/backup load <snapshot>` (or `/backup remote-load <snapshot>`) to view the snapshot's name,
+date, world ID, and source. Click **[Confirm load]**, or run the displayed command ending in
+`confirm`, to begin loading.
+
+Players receive a countdown before the server stops. Its default is 10 seconds; change it with
+`/backup set load-countdown-seconds <seconds>`, where `seconds` must be at least 0. FastBack may
+prepare the snapshot during the countdown. If preparation takes longer, the server waits until
+it finishes. Use `/backup cancel` during the countdown or preparation to cancel the load and
+remove prepared world files. The same command cancels an ongoing backup.
+
+After the countdown and preparation finish, FastBack stops the dedicated server cleanly, backs
+up its saved world, and replaces the world with the chosen snapshot. It then starts the server
+again automatically. Players can reconnect once startup finishes. The previous world is also
+preserved in a sibling recovery folder; its path is recorded in the server log. Cancellation is
+no longer available after shutdown begins.
+
+Automatic restart relaunches the original Java command with its JVM options, arguments, working
+directory, and environment after the old process exits. A service manager or hosting panel that
+kills the entire process tree when that process exits must provide its own restart support;
+FastBack's replacement process cannot survive that policy.
+
 ## Debugging
 
 If things go haywire, you can run

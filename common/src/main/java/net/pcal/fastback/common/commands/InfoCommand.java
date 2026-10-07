@@ -43,6 +43,7 @@ import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_MESSAG
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_BACKUP_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_MODS_BACKUP_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.LOCAL_RETENTION_POLICY;
+import static net.pcal.fastback.common.config.FastbackConfigKey.LOAD_COUNTDOWN_SECONDS;
 import static net.pcal.fastback.common.config.FastbackConfigKey.REMOTE_RETENTION_POLICY;
 import static net.pcal.fastback.common.config.FastbackConfigKey.RESTORE_DIRECTORY;
 import static net.pcal.fastback.common.config.FastbackConfigKey.SHUTDOWN_ACTION;
@@ -94,6 +95,7 @@ enum InfoCommand implements Command {
                         show(IS_BACKUP_ENABLED, conf::getBoolean, ulog);
                         show(REMOTE_PUSH_URL, conf::getString, ulog);
                         show(RESTORE_DIRECTORY, conf::getString, ulog);
+                        show(LOAD_COUNTDOWN_SECONDS, conf::getInt, ulog);
                         show(AUTOBACK_WAIT_MINUTES, conf::getInt, ulog);
                         show(IS_MODS_BACKUP_ENABLED, conf::getBoolean, ulog);
                         show(BROADCAST_ENABLED, conf::getBoolean, ulog);

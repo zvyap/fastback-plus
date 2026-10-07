@@ -73,6 +73,7 @@ class AutosaveListener implements Runnable {
                     }
                     lastBackupTime = System.currentTimeMillis();
                 } catch (Exception e) {
+                    Executor.checkCancelled();
                     syslog().error("auto-backup failed.", e);
                 }
             });

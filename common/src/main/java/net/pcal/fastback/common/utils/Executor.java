@@ -20,6 +20,8 @@ package net.pcal.fastback.common.utils;
 
 import net.pcal.fastback.common.logging.UserLogger;
 
+import java.util.concurrent.CancellationException;
+
 /**
  * Thin, singleton wrapper around an ExecutorService.  Use this to do things in separate threads.
  *
@@ -34,6 +36,20 @@ public interface Executor {
 
     // TODO kill UserLogger param and throw Blocking exception instead
     void execute(final ExecutionLock lock, final UserLogger ulog, final Runnable runnable);
+
+    /** Request cancellation without releasing the WRITE lock before cleanup finishes. */
+    boolean cancel();
+
+    /** Atomically finish the cancellable phase of the current WRITE task. */
+    boolean finishCancellableOperation(Runnable finish);
+
+    static boolean isCancelled() {
+        return ExecutorImpl.isCancellationRequested();
+    }
+
+    static void checkCancelled() {
+        if (isCancelled()) throw new CancellationException();
+    }
 
     int getActiveCount();
 

@@ -45,9 +45,11 @@ public class ProcessUtils {
     }
 
     public static int doExec(final String[] args, final Map<String, String> envOriginal, final Consumer<String> stdoutSink, final Consumer<String> stderrSink, boolean throwOnNonZero) throws ProcessException {
+        Executor.checkCancelled();
         syslog().debug("Executing " + String.join(" ", args));
         final ProcessBuilder pb = new ProcessBuilder(args);
         final Map<String, String> env = pb.environment();
+        env.putAll(envOriginal);
         // Output a few values that are important for debugging; don't indiscriminately dump everything or someone's going
         // to end up uploading a bunch of passwords into pastebin.
         syslog().debug("PATH: " + env.get("PATH"));
@@ -71,12 +73,21 @@ public class ProcessUtils {
             errorBuffer.add("[STDERR] " + line);
         };
         final int exit;
+        Process p = null;
         try {
-            final Process p = pb.start();
+            p = pb.start();
             exit = drainAndWait(p, new LineWriter(stdout), new LineWriter(stderr));
-        } catch (IOException | InterruptedException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            Executor.checkCancelled();
             throw new ProcessException(args, 0, errorBuffer, e);
+        } catch (IOException e) {
+            Executor.checkCancelled();
+            throw new ProcessException(args, 0, errorBuffer, e);
+        } finally {
+            if (p != null && p.isAlive()) stopProcess(p);
         }
+        Executor.checkCancelled();
         if (throwOnNonZero && exit != 0) {
             throw new ProcessException(args, exit, errorBuffer);
         }
@@ -85,6 +96,20 @@ public class ProcessUtils {
 
     // ======================================================================
     // Private
+
+    private static void stopProcess(Process process) {
+        final boolean interrupted = Thread.interrupted();
+        try {
+            final List<ProcessHandle> descendants = process.descendants().toList();
+            // Git can leave LFS/SSH children writing to the repository after the parent is stopped.
+            descendants.forEach(ProcessHandle::destroyForcibly);
+            process.destroyForcibly();
+            descendants.forEach(child -> child.onExit().join());
+            process.onExit().join();
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
+        }
+    }
 
     private static class LineWriter extends Writer {
 
@@ -142,6 +167,7 @@ public class ProcessUtils {
         char[] buffer = new char[1024];
 
         while (true) {
+            Executor.checkCancelled();
             boolean readAny = false;
             //
             // process stdin
@@ -171,14 +197,11 @@ public class ProcessUtils {
             if (readAny) {
                 continue;
             } else if (!process.isAlive()) {
+                stdoutSink.flush();
+                stderrSink.flush();
                 return process.exitValue();
             } else {
-                try {
-                    Thread.sleep(10); // FIXME add timeout?
-                } catch (InterruptedException ie) {
-                    process.destroy();
-                    throw ie;
-                }
+                Thread.sleep(10); // FIXME add timeout?
             }
         }
     }

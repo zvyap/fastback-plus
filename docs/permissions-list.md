@@ -1,5 +1,6 @@
 
 * `fastback.command`
+* `fastback.command.cancel`
 * `fastback.command.create-file-remote`
 * `fastback.command.delete`
 * `fastback.command.disable`

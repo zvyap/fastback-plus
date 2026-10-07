@@ -32,6 +32,7 @@ import net.pcal.fastback.common.mixins.ServerAccessors;
 import net.pcal.fastback.common.mixins.SessionAccessors;
 import net.pcal.fastback.common.repo.Repo;
 import net.pcal.fastback.common.repo.RepoFactory;
+import net.pcal.fastback.common.utils.ServerRestart;
 import net.pcal.fastback.common.utils.ServerWorldRestore;
 import org.apache.logging.log4j.LogManager;
 import org.eclipse.jgit.transport.SshSessionFactory;
@@ -52,6 +53,7 @@ import static net.pcal.fastback.common.logging.UserMessage.localized;
 import static net.pcal.fastback.common.mod.UserMessageUtil.messageToText;
 import static net.pcal.fastback.common.utils.EnvironmentUtils.getGitLfsVersion;
 import static net.pcal.fastback.common.utils.EnvironmentUtils.getGitVersion;
+import static net.pcal.fastback.common.utils.Executor.checkCancelled;
 import static net.pcal.fastback.common.utils.Executor.executor;
 
 class ModImpl implements Mod {
@@ -67,7 +69,7 @@ class ModImpl implements Mod {
     private Path tempRestoresDirectory = null;
     private volatile ServerRestoreRequest pendingRestore = null;
 
-    private record ServerRestoreRequest(Path world, Path staged, Path previous) {
+    private record ServerRestoreRequest(Path world, Path staged, Path previous, ServerRestart restart) {
     }
 
     // ======================================================================
@@ -113,7 +115,8 @@ class ModImpl implements Mod {
             executor().stop();
             this.clearHudText();
             final RepoFactory rf = RepoFactory.rf();
-            if (rf.isGitRepo(worldSaveDir)) {
+            final ServerRestoreRequest restore = this.pendingRestore;
+            if (restore == null && rf.isGitRepo(worldSaveDir)) {
                 try (final Repo repo = rf.load(worldSaveDir)) {
                     final GitConfig config = repo.getConfig();
                     if (config.getBoolean(IS_BACKUP_ENABLED)) {
@@ -128,18 +131,28 @@ class ModImpl implements Mod {
                     syslog().error("Shutdown action failed.", e);
                 }
             }
-            final ServerRestoreRequest restore = this.pendingRestore;
             if (restore != null) {
                 try {
                     // Loader stopped events run after level IO closes. Release the world lock too.
                     ((ServerAccessors) this.minecraftServer).getStorageSource().close();
-                    ServerWorldRestore.install(restore.world(), restore.staged(), restore.previous());
+                    ServerRestart.complete(() -> {
+                        try (final Repo repo = rf.load(restore.world())) {
+                            repo.backupBeforeLoad(ulog);
+                        }
+                    }, () -> ServerWorldRestore.install(restore.world(), restore.staged(), restore.previous()),
+                            restore.restart()::start);
                     syslog().info("Snapshot loaded. Previous world saved at " + restore.previous() +
-                            ". Restart the server to play the restored world.");
+                            ". The server will restart automatically after this JVM exits.");
                 } catch (Exception e) {
-                    syslog().error("Snapshot installation failed. Preserved world paths: active=" + restore.world() +
+                    syslog().error("Snapshot backup, installation or automatic restart failed. Preserved world paths: active=" + restore.world() +
                             ", staged=" + restore.staged() + ", previous=" + restore.previous() +
                             ". Check these paths before restarting the server.", e);
+                } finally {
+                    try {
+                        restore.restart().close();
+                    } catch (IOException e) {
+                        syslog().error("Could not remove the unused restart helper", e);
+                    }
                 }
                 this.pendingRestore = null;
             }
@@ -168,19 +181,32 @@ class ModImpl implements Mod {
         final Path staged = stagedWorld.toAbsolutePath().normalize();
         final Path previous = world.resolveSibling(world.getFileName() + "-fastback-before-load-" + UUID.randomUUID());
         ServerWorldRestore.validate(world, staged, previous);
-        final ServerRestoreRequest restore = new ServerRestoreRequest(world, staged, previous);
-        this.pendingRestore = restore;
+        final ServerRestart restart = ServerRestart.prepare();
+        final ServerRestoreRequest restore = new ServerRestoreRequest(world, staged, previous, restart);
         syslog().info("Prepared snapshot at " + staged + ". Outgoing world will be preserved at " + previous);
+        boolean committed = false;
         try {
-            server.execute(() -> {
-                if (this.pendingRestore == restore) {
-                    this.sendBroadcast(localized("fastback.chat.load-stopping"));
-                    server.halt(false);
-                }
+            committed = executor().finishCancellableOperation(() -> {
+                this.pendingRestore = restore;
+                server.execute(() -> {
+                    if (this.pendingRestore == restore) {
+                        this.sendBroadcast(localized("fastback.chat.load-stopping"));
+                        server.halt(false);
+                    }
+                });
             });
+            if (!committed) checkCancelled();
         } catch (RuntimeException e) {
             this.pendingRestore = null;
             throw e;
+        } finally {
+            if (!committed) {
+                try {
+                    restart.close();
+                } catch (IOException e) {
+                    syslog().error("Could not remove the unused restart helper", e);
+                }
+            }
         }
     }
 
@@ -207,17 +233,26 @@ class ModImpl implements Mod {
 
     @Override
     public void sendChat(UserMessage message, CommandSourceStack scs) {
-        if (message.style() == ERROR) {
-            scs.sendFailure(messageToText(message));
-        } else {
-            scs.sendSuccess(() -> messageToText(message), false);
-        }
+        final MinecraftServer server = scs.getServer();
+        server.execute(() -> {
+            if (this.minecraftServer != server || !server.isRunning()) return;
+            if (message.style() == ERROR) {
+                scs.sendFailure(messageToText(message));
+            } else {
+                scs.sendSuccess(() -> messageToText(message), false);
+            }
+        });
     }
 
     @Override
     public void sendBroadcast(UserMessage userMessage) {
-        if (this.minecraftServer != null && this.minecraftServer.isDedicatedServer()) {
-            this.minecraftServer.getPlayerList().broadcastSystemMessage(messageToText(userMessage), false);
+        final MinecraftServer server = this.minecraftServer;
+        if (server != null && server.isDedicatedServer()) {
+            server.execute(() -> {
+                if (this.minecraftServer == server && server.isRunning()) {
+                    server.getPlayerList().broadcastSystemMessage(messageToText(userMessage), false);
+                }
+            });
         }
     }
 

@@ -21,7 +21,7 @@ package net.pcal.fastback.common.utils;
 import net.pcal.fastback.common.logging.UserLogger;
 
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import static java.util.Objects.requireNonNull;
 import static net.pcal.fastback.common.logging.SystemLogger.syslog;
 import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.ERROR;
+import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.WARNING;
 import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
 import static net.pcal.fastback.common.mod.Mod.mod;
 
@@ -38,12 +39,24 @@ import static net.pcal.fastback.common.mod.Mod.mod;
  */
 class ExecutorImpl implements Executor {
 
-    private ThreadPoolExecutor executor = null;
+    private volatile ThreadPoolExecutor executor = null;
 
-    private Future<?> exclusiveFuture = null;
+    private static final ThreadLocal<WriteTask> CURRENT_TASK = new ThreadLocal<>();
+    private WriteTask exclusiveTask;
+
+    private static class WriteTask {
+        private volatile boolean cancelled;
+        private boolean cancellable = true;
+        private Thread worker;
+    }
+
+    static boolean isCancellationRequested() {
+        final WriteTask task = CURRENT_TASK.get();
+        return Thread.currentThread().isInterrupted() || (task != null && task.cancelled);
+    }
 
     @Override
-    public void execute(ExecutionLock lock, UserLogger ulog, Runnable runnable) {
+    public synchronized void execute(ExecutionLock lock, UserLogger ulog, Runnable runnable) {
         requireNonNull(lock, "lock");
         if (this.executor == null) throw new IllegalStateException("Executor not started");
         final Runnable task = () -> {
@@ -59,11 +72,18 @@ class ExecutorImpl implements Executor {
                 this.executor.submit(task);
                 break;
             case WRITE:
-                if (this.exclusiveFuture != null && !this.exclusiveFuture.isDone()) {
+                if (this.exclusiveTask != null) {
                     ulog.message(styledLocalized("fastback.chat.thread-busy", ERROR));
                 } else {
                     syslog().debug("executing " + runnable);
-                    this.exclusiveFuture = this.executor.submit(task);
+                    final WriteTask writeTask = new WriteTask();
+                    this.exclusiveTask = writeTask;
+                    try {
+                        this.executor.submit(() -> runWriteTask(writeTask, task, ulog));
+                    } catch (RuntimeException e) {
+                        this.exclusiveTask = null;
+                        throw e;
+                    }
                 }
                 break;
             default:
@@ -71,23 +91,70 @@ class ExecutorImpl implements Executor {
         }
     }
 
-    @Override
-    public int getActiveCount() {
-        return this.executor.getActiveCount();
+    private void runWriteTask(WriteTask writeTask, Runnable task, UserLogger ulog) {
+        synchronized (this) {
+            writeTask.worker = Thread.currentThread();
+        }
+        CURRENT_TASK.set(writeTask);
+        try {
+            Executor.checkCancelled();
+            task.run();
+            Executor.checkCancelled();
+        } catch (CancellationException e) {
+            ulog.message(styledLocalized("fastback.chat.operation-cancelled", WARNING));
+        } finally {
+            CURRENT_TASK.remove();
+            // A cancelled Future reports completion before its worker exits. Keep ownership until this finally.
+            synchronized (this) {
+                writeTask.worker = null;
+                if (this.exclusiveTask == writeTask) this.exclusiveTask = null;
+            }
+            if (writeTask.cancelled) Thread.interrupted();
+        }
     }
 
     @Override
-    public void start() {
+    public synchronized boolean cancel() {
+        final WriteTask task = this.exclusiveTask;
+        if (task == null || !task.cancellable) return false;
+        if (task.cancelled) return true;
+        task.cancelled = true;
+        if (task.worker != null) task.worker.interrupt();
+        return true;
+    }
+
+    @Override
+    public synchronized boolean finishCancellableOperation(Runnable finish) {
+        final WriteTask task = CURRENT_TASK.get();
+        if (task == null || task != this.exclusiveTask) throw new IllegalStateException("No current WRITE task");
+        if (task.cancelled || Thread.currentThread().isInterrupted()) return false;
+        task.cancellable = false;
+        finish.run();
+        return true;
+    }
+
+    @Override
+    public synchronized int getActiveCount() {
+        return this.executor == null ? 0 : this.executor.getActiveCount();
+    }
+
+    @Override
+    public synchronized void start() {
+        if (this.executor != null) throw new IllegalStateException("Executor already started");
         this.executor = new ThreadPoolExecutor(0, 3, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
     }
 
     @Override
     public void stop() {
-        shutdownExecutor(this.executor);
-        if (!this.executor.isTerminated()) {
+        final ThreadPoolExecutor pool = this.executor;
+        if (pool == null) return;
+        shutdownExecutor(pool);
+        if (!pool.isTerminated()) {
             throw new IllegalStateException("Backup tasks did not stop; refusing to release the world");
         }
-        this.executor = null;
+        synchronized (this) {
+            if (this.executor == pool) this.executor = null;
+        }
     }
 
     /**

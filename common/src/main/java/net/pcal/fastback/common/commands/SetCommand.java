@@ -54,6 +54,7 @@ import static net.pcal.fastback.common.config.FastbackConfigKey.IS_BACKUP_ENABLE
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_LOCK_CLEANUP_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_MODS_BACKUP_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.LOCAL_RETENTION_POLICY;
+import static net.pcal.fastback.common.config.FastbackConfigKey.LOAD_COUNTDOWN_SECONDS;
 import static net.pcal.fastback.common.config.FastbackConfigKey.REMOTE_RETENTION_POLICY;
 import static net.pcal.fastback.common.config.FastbackConfigKey.RESTORE_DIRECTORY;
 import static net.pcal.fastback.common.config.FastbackConfigKey.SHUTDOWN_ACTION;
@@ -93,6 +94,9 @@ enum SetCommand implements Command {
         registerStringConfigValue(RESTORE_DIRECTORY, "full-directory-path", sc);
         registerStringConfigValue(REMOTE_PUSH_URL, "url", sc);
         registerIntegerConfigValue(AUTOBACK_WAIT_MINUTES, "minutes", sc);
+        sc.then(literal(LOAD_COUNTDOWN_SECONDS.getDisplayName())
+                .then(argument("seconds", IntegerArgumentType.integer(0))
+                        .executes(cc -> setIntegerConfigValue(LOAD_COUNTDOWN_SECONDS, "seconds", cc))));
 
         {
             final List<String> schedulableActions = new ArrayList<>();

@@ -19,6 +19,7 @@
 package net.pcal.fastback.common.repo;
 
 import org.eclipse.jgit.lib.ProgressMonitor;
+import net.pcal.fastback.common.utils.Executor;
 
 abstract class JGitPercentageProgressMonitor implements ProgressMonitor {
 
@@ -35,6 +36,7 @@ abstract class JGitPercentageProgressMonitor implements ProgressMonitor {
 
     @Override
     final public void beginTask(String taskName, int totalWork) {
+        Executor.checkCancelled();
         this.currentTask = taskName;
         this.currentTotalWork = totalWork;
         this.totalCompleted = 0;
@@ -43,6 +45,7 @@ abstract class JGitPercentageProgressMonitor implements ProgressMonitor {
 
     @Override
     final public void update(int completed) {
+        Executor.checkCancelled();
         this.totalCompleted += completed;
         int percent = this.currentTotalWork == 0 ? 0 : (this.totalCompleted * 100) / this.currentTotalWork;
         this.progressUpdate(currentTask, percent);
@@ -50,13 +53,14 @@ abstract class JGitPercentageProgressMonitor implements ProgressMonitor {
 
     @Override
     final public void endTask() {
+        Executor.checkCancelled();
         this.progressDone(currentTask);
         currentTask = null;
     }
 
     @Override
     final public boolean isCancelled() {
-        return false;
+        return Executor.isCancelled();
     }
 
     protected abstract void progressStart(String taskName);

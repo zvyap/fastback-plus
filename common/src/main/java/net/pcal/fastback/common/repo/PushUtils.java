@@ -24,6 +24,7 @@ import net.pcal.fastback.common.logging.UserLogger;
 import net.pcal.fastback.common.logging.UserMessage;
 import net.pcal.fastback.common.utils.ProcessException;
 import net.pcal.fastback.common.utils.ProcessUtils;
+import net.pcal.fastback.common.utils.Executor;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
@@ -81,6 +82,7 @@ abstract class PushUtils {
     // TODO stop throwing IOE
     // TODO stop passing repo
     static void doPush(SnapshotId sid, RepoImpl repo, UserLogger ulog) throws IOException, ProcessException {
+        Executor.checkCancelled();
         try {
             final GitConfig conf = repo.getConfig();
             final String pushUrl = conf.getString(REMOTE_PUSH_URL);
@@ -98,6 +100,7 @@ abstract class PushUtils {
             }
             final ListMultimap<WorldId, SnapshotId> snapshotsPerWorld =
                     SnapshotIdUtils.getSnapshotsPerWorld(remoteBranchRefs, repo.getSidCodec());
+            Executor.checkCancelled();
             if (conf.getBoolean(IS_UUID_CHECK_ENABLED)) {
                 boolean uuidCheckResult;
                 try {
@@ -126,8 +129,10 @@ abstract class PushUtils {
                 ulog.message(styledLocalized("fastback.chat.push-started", NORMAL, pushUrl));
                 jgit_doPush(jgit, sid.getBranchName(), conf, ulog);
             }
+            Executor.checkCancelled();
             syslog().info("Remote backup complete.");
         } catch (GitAPIException e) {
+            Executor.checkCancelled();
             throw new IOException(e);
         }
     }

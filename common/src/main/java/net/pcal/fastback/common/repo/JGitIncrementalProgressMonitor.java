@@ -19,6 +19,7 @@
 package net.pcal.fastback.common.repo;
 
 import org.eclipse.jgit.lib.ProgressMonitor;
+import net.pcal.fastback.common.utils.Executor;
 
 import static java.util.Objects.requireNonNull;
 
@@ -70,7 +71,7 @@ class JGitIncrementalProgressMonitor implements ProgressMonitor {
 
     @Override
     public boolean isCancelled() {
-        return false;
+        return Executor.isCancelled() || this.delegate.isCancelled();
     }
 
     @Override

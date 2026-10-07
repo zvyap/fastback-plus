@@ -42,6 +42,7 @@ public enum FastbackConfigKey implements GitConfigKey {
     IS_TRACKING_BRANCH_CLEANUP_ENABLED(true),
     IS_UUID_CHECK_ENABLED(true),
     LOCAL_RETENTION_POLICY("retention-policy", null),
+    LOAD_COUNTDOWN_SECONDS("load-countdown-seconds", 10),
     REMOTE_NAME("remote-name", "origin"),
     REMOTE_RETENTION_POLICY("remote-retention-policy", null),
     RESTORE_DIRECTORY("restore-directory", null),

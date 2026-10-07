@@ -119,7 +119,7 @@ public interface Mod {
      */
     Path getDefaultRestoresDir() throws IOException;
 
-    /** Schedule a prepared snapshot for installation after a dedicated server stops. */
+    /** Stop, back up and install a prepared snapshot, then automatically restart the dedicated server. */
     void requestServerRestore(Path stagedWorld) throws IOException;
 
     /** Whether the server is stopping to load a prepared snapshot. */

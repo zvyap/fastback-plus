@@ -6,7 +6,8 @@
 | `local`                           | Perform a local backup immediately.                                                      |
 | `full`                            | Perform a local backup followed by a remote push (if configured).                        |
 | `restore`                         | Restore a backup snapshot.                                                               |
-| `load <snapshot> confirm`         | Load a local snapshot into the dedicated server world; stops the server for restart.     |
+| `load <snapshot>`                 | Show a local snapshot's details and a clickable confirmation; loads and restarts the dedicated server after a countdown. |
+| `cancel`                          | Cancel an ongoing backup or snapshot load before the server starts stopping.             |
 | `delete`                          | Delete an individual snapshot.                                                           |
 | `info`                            | Info about current backup state and settings.                                            |
 | `list`                            | List backup snapshots for this world.                                                    |
@@ -18,12 +19,13 @@
 | `remote-list`                     | List remote snapshots.                                                                   |
 | `remote-prune`                    | Delete old snapshots from the remote backup according to the remote retention policy.    |
 | `remote-restore`                  | Restore a remote snapshot.                                                               |
-| `remote-load <snapshot> confirm`  | Load a remote snapshot into the dedicated server world; stops the server for restart.    |
+| `remote-load <snapshot>`          | Show a remote snapshot's details and a clickable confirmation; loads and restarts the dedicated server after a countdown. |
 | `set retention-policy`            | Set retention policy for local snapshots.                                                |
 | `set remote-url`                  | Set the url for remote backups.                                                          |
 | `set shutdown-action`             | Set an action to perform on shutdown.                                                    |
 | `set autoback-action`             | Set an action to perform during auto-backups.                                            |
 | `set autoback-wait`               | Set the minimum number of minutes to wait between auto-backups.                          |
+| `set load-countdown-seconds <seconds>` | Set the snapshot-load countdown, in seconds. Defaults to 10; accepts 0 or greater.   |
 | `set restore-directory`           | Target directory for restored snapshots.  Useful for servers with limited tmp space.     |
 | `set remote-retention-policy`     | Set retention policy for remote snapshots.                                               |
 | `set mods-backup-enabled` _NEW_!  | Whether to also backup mod jars and config files (in `.fastback/mods-backup`)            |

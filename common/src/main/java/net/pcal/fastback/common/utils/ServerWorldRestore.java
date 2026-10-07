@@ -19,7 +19,6 @@
 package net.pcal.fastback.common.utils;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -87,6 +86,7 @@ public final class ServerWorldRestore {
             }
 
             private void checkEntry(final Path path, final BasicFileAttributes attrs) throws IOException {
+                Executor.checkCancelled();
                 if (attrs.isSymbolicLink() || (!attrs.isDirectory() && !attrs.isRegularFile())) {
                     throw new IOException("Unsupported staged world entry: " + path);
                 }
@@ -115,7 +115,8 @@ public final class ServerWorldRestore {
                 throw new IOException("Staged level.dat does not contain an NBT compound: " + level);
             }
             // Read through the trailer so damaged or truncated backups cannot reach the live world.
-            input.transferTo(OutputStream.nullOutputStream());
+            final byte[] buffer = new byte[8192];
+            while (input.read(buffer) != -1) Executor.checkCancelled();
         }
     }
 

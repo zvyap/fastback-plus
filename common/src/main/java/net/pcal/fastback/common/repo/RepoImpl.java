@@ -24,6 +24,7 @@ import net.pcal.fastback.common.logging.UserMessage;
 import net.pcal.fastback.common.repo.SnapshotIdUtils.SnapshotIdCodec;
 import net.pcal.fastback.common.repo.WorldIdUtils.WorldIdInfo;
 import net.pcal.fastback.common.utils.ProcessException;
+import net.pcal.fastback.common.utils.Executor;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
@@ -98,6 +99,7 @@ class RepoImpl implements Repo {
         try {
             newSid = CommitUtils.doCommitSnapshot(this, ulog);
         } catch (IOException | GitAPIException | ProcessException e) {
+            Executor.checkCancelled();
             syslog().error(e);
             ulog.message(styledLocalized("fastback.chat.commit-failed", ERROR));
             return;
@@ -105,10 +107,12 @@ class RepoImpl implements Repo {
         try {
             PushUtils.doPush(newSid, this, ulog);
         } catch (IOException | ProcessException e) {
+            Executor.checkCancelled();
             ulog.message(styledLocalized("fastback.chat.push-failed", ERROR));
             syslog().error(e);
             return;
         }
+        Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
     }
 
@@ -122,11 +126,20 @@ class RepoImpl implements Repo {
         try {
             newSid = CommitUtils.doCommitSnapshot(this, ulog);
         } catch (IOException | ProcessException | GitAPIException e) {
+            Executor.checkCancelled();
             ulog.message(styledLocalized("fastback.chat.commit-failed", ERROR));
             syslog().error(e);
             return;
         }
+        Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
+    }
+
+    @Override
+    public void backupBeforeLoad(UserLogger ulog) throws Exception {
+        if (!isNativeOk(this.getConfig(), ulog, false)) throw new IOException("Backup tools are unavailable");
+        checkIndexLock(ulog);
+        CommitUtils.doCommitSnapshot(this, ulog);
     }
 
     @Override
@@ -140,10 +153,12 @@ class RepoImpl implements Repo {
         try {
             PushUtils.doPush(sid, this, ulog);
         } catch (IOException | ProcessException e) {
+            Executor.checkCancelled();
             ulog.message(styledLocalized("fastback.chat.commit-failed", ERROR));
             syslog().error(e);
             return;
         }
+        Executor.checkCancelled();
         ulog.message(UserMessage.localized("fastback.chat.push-done-elapsed", sid.getShortName(), getDuration(start)));
     }
 
@@ -164,6 +179,7 @@ class RepoImpl implements Repo {
         try {
             ReclamationUtils.doReclamation(this, ulog);
         } catch (ProcessException | GitAPIException e) {
+            Executor.checkCancelled();
             ulog.message(styledLocalized("fastback.chat.gc-failed", ERROR));
             syslog().error(e);
         }

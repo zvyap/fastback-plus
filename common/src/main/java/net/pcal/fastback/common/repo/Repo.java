@@ -69,6 +69,9 @@ public interface Repo extends AutoCloseable {
 
     void doLoadSnapshot(String snapshotName, boolean remote, UserLogger ulog);
 
+    /** Create the mandatory pre-load snapshot, propagating every backup failure. */
+    void backupBeforeLoad(UserLogger ulog) throws Exception;
+
     void doGc(UserLogger ulog);
 
     void doPushSnapshot(SnapshotId sid, UserLogger ulog);
