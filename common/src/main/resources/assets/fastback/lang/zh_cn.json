@@ -127,5 +127,7 @@
   "fastback.chat.load-warning"                  : "保存当前世界、替换世界并重启服务器。",
   "fastback.chat.load-cancel-hint"              : "服务器停止前可用 /backup cancel 取消",
   "fastback.broadcast.done"                     : "备份完成：%s • 快照大小：%s • 备份总大小：%s",
-  "fastback.broadcast.done-elapsed"             : "备份完成。用时 %s（%s / %s）。"
+  "fastback.broadcast.done-elapsed"             : "备份完成。用时 %s（%s / %s）。",
+  "fastback.broadcast.completed-elapsed"        : "备份完成。用时 %s（%s / %s）。",
+  "fastback.message.custom"                     : "%s"
 }

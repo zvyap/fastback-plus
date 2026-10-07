@@ -54,12 +54,12 @@ configuration changes, and server lifecycle events invalidate the cache; the
 snapshot index also refreshes after 30 seconds.
 
 Successful backups broadcast their elapsed time, snapshot size, and total backup
-storage by default: `Backup complete. Used 5 seconds (228 MB / 5 GB).`
+storage by default: `Backup completed. Used 5 seconds (228 MB / 5 GB).`
 Disable this completion notice independently of the starting
 notice with `/backup set broadcast-done-enabled false`. To customize it:
 
 ```text
-/backup set broadcast-done-message Backup complete. Used {elapsed} ({snapshot_size} / {total_size}).
+/backup set broadcast-done-message Backup completed. Used {elapsed} ({snapshot_size} / {total_size}).
 ```
 
 Supported placeholders are `{elapsed}`, `{snapshot}`, `{snapshot_size}`, `{total_size}`,
@@ -70,3 +70,18 @@ files, including the original size of Git LFS files. Total size is the physical
 storage used by the local Git repository, including its shared history and LFS
 objects. These sizes differ because backups share unchanged data. Unavailable
 sizes display `-`; a size lookup failure does not fail a completed backup.
+
+Both `broadcast-message` (the starting notice) and `broadcast-done-message`
+support color and style tokens. Use Minecraft color names such as `{red}`,
+`{green}`, `{aqua}`, or `{gold}`, or a six-digit hexadecimal color such as
+`{#FFAA00}`. Styles are `{bold}`, `{italic}`, `{underlined}`, `{strikethrough}`,
+and `{obfuscated}`. Tokens apply to the following text; `{reset}` restores the
+message's default style. Unknown tokens remain literal text. For example:
+
+```text
+/backup set broadcast-message {gold}{bold}Backup starting{reset}...
+/backup set broadcast-done-message {green}Backup completed. {reset}Used {aqua}{elapsed}{reset} ({#FFAA00}{snapshot_size}{reset} / {gold}{total_size}{reset}).
+```
+
+The completion placeholders above can be combined with formatting tokens;
+placeholder values such as remarks remain literal text.

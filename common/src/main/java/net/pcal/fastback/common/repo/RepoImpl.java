@@ -68,6 +68,7 @@ import static net.pcal.fastback.common.logging.UserMessage.localized;
 import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
 import static net.pcal.fastback.common.logging.UserMessage.styledRaw;
 import static net.pcal.fastback.common.mod.Mod.mod;
+import static net.pcal.fastback.common.mod.UserMessageUtil.configuredMessage;
 import static net.pcal.fastback.common.repo.PushUtils.jgit_lsRemote;
 import static net.pcal.fastback.common.repo.PushUtils.native_lsRemote;
 import static net.pcal.fastback.common.utils.EnvironmentUtils.isNativeOk;
@@ -444,7 +445,7 @@ class RepoImpl implements Repo {
         final UserMessage m;
         final String configuredMessage = getConfig().getString(BROADCAST_MESSAGE);
         if (configuredMessage != null) {
-            m = styledRaw(configuredMessage, BROADCAST);
+            m = configuredMessage(configuredMessage, Map.of(), BROADCAST);
         } else {
             m = styledLocalized("fastback.broadcast.message", BROADCAST);
         }
@@ -483,18 +484,18 @@ class RepoImpl implements Repo {
         Executor.checkCancelled();
         final UserMessage message;
         if (template == null) {
-            message = styledLocalized("fastback.broadcast.done-elapsed", BROADCAST,
+            message = styledLocalized("fastback.broadcast.completed-elapsed", BROADCAST,
                     Component.literal(elapsed).withStyle(AQUA),
                     Component.literal(snapshotSize).withStyle(GOLD),
                     Component.literal(totalSize).withStyle(GOLD));
         } else {
-            message = styledRaw(BackupCompletion.expand(template, Map.of(
+            message = configuredMessage(template, Map.of(
                     "snapshot", snapshot.getShortName(),
                     "snapshot_size", snapshotSize,
                     "total_size", totalSize,
                     "elapsed", elapsed,
                     "remark", metadata.remark() == null || metadata.remark().isBlank() ? "-" : metadata.remark(),
-                    "creator", metadata.creator() == null ? "automatic" : metadata.creator())), BROADCAST);
+                    "creator", metadata.creator() == null ? "automatic" : metadata.creator()), BROADCAST);
         }
         mod().sendBroadcast(message);
     }

@@ -143,5 +143,7 @@
   "fastback.chat.load-warning"                  : "Saves the current world, replaces it and restarts the server.",
   "fastback.chat.load-cancel-hint"              : "/backup cancel before shutdown",
   "fastback.broadcast.done"                     : "Backup complete: %s • Snapshot: %s • Total backups: %s",
-  "fastback.broadcast.done-elapsed"             : "Backup complete. Used %s (%s / %s)."
+  "fastback.broadcast.done-elapsed"             : "Backup complete. Used %s (%s / %s).",
+  "fastback.broadcast.completed-elapsed"        : "Backup completed. Used %s (%s / %s).",
+  "fastback.message.custom"                     : "%s"
 }
