@@ -48,6 +48,9 @@ import static net.pcal.fastback.common.config.FastbackConfigKey.LOCAL_RETENTION_
 import static net.pcal.fastback.common.config.FastbackConfigKey.LOAD_COUNTDOWN_SECONDS;
 import static net.pcal.fastback.common.config.FastbackConfigKey.REMOTE_RETENTION_POLICY;
 import static net.pcal.fastback.common.config.FastbackConfigKey.RESTORE_DIRECTORY;
+import static net.pcal.fastback.common.config.FastbackConfigKey.SERVER_EMPTY_ACTION;
+import static net.pcal.fastback.common.config.FastbackConfigKey.SERVER_EMPTY_MAX;
+import static net.pcal.fastback.common.config.FastbackConfigKey.SERVER_EMPTY_WAIT_MINUTES;
 import static net.pcal.fastback.common.config.FastbackConfigKey.SHUTDOWN_ACTION;
 import static net.pcal.fastback.common.config.OtherConfigKey.REMOTE_PUSH_URL;
 import static net.pcal.fastback.common.logging.UserLogger.ulog;
@@ -109,6 +112,13 @@ enum InfoCommand implements Command {
                         ulog.message(UserMessage.localized("fastback.chat.info-shutdown-action", getActionDisplay(shutdownAction)));
                         final SchedulableAction autobackAction = SchedulableAction.forConfigValue(conf.getString(AUTOBACK_ACTION));
                         ulog.message(UserMessage.localized("fastback.chat.info-autoback-action", getActionDisplay(autobackAction)));
+                        if (scs.getServer().isDedicatedServer()) {
+                            show(SERVER_EMPTY_ACTION, key -> getActionDisplay(SchedulableAction.forConfigValue(conf,
+                                    conf.isSet(key) ? SERVER_EMPTY_ACTION : AUTOBACK_ACTION)), ulog);
+                            show(SERVER_EMPTY_WAIT_MINUTES, key -> conf.getInt(
+                                    conf.isSet(key) ? SERVER_EMPTY_WAIT_MINUTES : AUTOBACK_WAIT_MINUTES), ulog);
+                            show(SERVER_EMPTY_MAX, conf::getInt, ulog);
+                        }
 
                         showRetentionPolicy(ulog,
                                 conf.getString(LOCAL_RETENTION_POLICY),

@@ -20,6 +20,7 @@ package net.pcal.fastback.fabric;
 
 import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.pcal.fastback.common.mod.Mod;
 
 /**
@@ -39,5 +40,16 @@ public class FabricServerInitializer implements DedicatedServerModInitializer {
         ServerLifecycleEvents.SERVER_STOPPED.register(
                 minecraftServer -> Mod.mod().onWorldStop()
         );
+        ServerPlayConnectionEvents.JOIN.register((listener, sender, server) ->
+                server.execute(() -> Mod.mod().onServerPlayersChanged(server, false)));
+        ServerPlayConnectionEvents.DISCONNECT.register((listener, server) -> {
+            final var departingPlayer = listener.player;
+            server.execute(() -> {
+                // Fabric can notify before vanilla removes the departing player.
+                final boolean empty = server.getPlayerList().getPlayers().stream()
+                        .allMatch(player -> player == departingPlayer);
+                Mod.mod().onServerPlayersChanged(server, empty);
+            });
+        });
     }
 }

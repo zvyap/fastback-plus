@@ -64,7 +64,7 @@ class ModImpl implements Mod {
 
     private final LoaderHelper loaderHelper;
     private final ClientHelper clientHelper; // null on a dedicated server
-    private final Runnable autoSaveListener;
+    private final AutosaveListener autoSaveListener;
     private volatile MinecraftServer minecraftServer = null; // currently open world
     private volatile boolean isWorldSaveEnabled = true;
     private Path tempRestoresDirectory = null;
@@ -102,6 +102,8 @@ class ModImpl implements Mod {
     @Override
     public void onWorldStart(final MinecraftServer minecraftServer) {
         this.minecraftServer = requireNonNull(minecraftServer);
+        // SERVER_STARTING runs before the player list exists; dedicated servers start empty.
+        this.autoSaveListener.reset(minecraftServer.isDedicatedServer());
         SnapshotCache.clear();
         executor().start();
         syslog().debug("onWorldStart complete");
@@ -322,9 +324,19 @@ class ModImpl implements Mod {
     @Override
     public void autoSaveCompleted() {
         if (this.autoSaveListener != null) {
+            final MinecraftServer server = this.minecraftServer;
+            if (server == null) return;
+            this.autoSaveListener.onServerPlayersChanged(server.isDedicatedServer() && server.getPlayerCount() == 0);
             this.autoSaveListener.run();
         } else {
             syslog().warn("Autosave just happened but, unexpectedly, no one is listening.");
+        }
+    }
+
+    @Override
+    public void onServerPlayersChanged(MinecraftServer server, boolean empty) {
+        if (this.minecraftServer == server && server.isDedicatedServer()) {
+            this.autoSaveListener.onServerPlayersChanged(empty);
         }
     }
 

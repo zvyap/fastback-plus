@@ -114,6 +114,9 @@ enum HelpCommand implements Command {
                 if (subcommand.equals(available)) {
                     final String prefix = "/backup " + subcommand + ": ";
                     ulog.message(UserMessage.localized("fastback.help.command." + subcommand, prefix));
+                    if ("set".equals(subcommand) && cc.getSource().getServer().isDedicatedServer()) {
+                        ulog.message(UserMessage.localized("fastback.help.server-empty-settings"));
+                    }
                     return SUCCESS;
                 }
             }

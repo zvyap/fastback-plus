@@ -26,6 +26,9 @@
 | `set shutdown-action`             | Set an action to perform on shutdown.                                                    |
 | `set autoback-action`             | Set an action to perform during auto-backups.                                            |
 | `set autoback-wait`               | Set the minimum number of minutes to wait between auto-backups.                          |
+| `set backup-server-empty-action <action>` | Dedicated servers only: action while no players are connected (`none`, `local`, `full`, `full-gc`). `none` skips scheduled backups while empty. |
+| `set backup-server-empty-wait <minutes>` | Dedicated servers only: minimum minutes after becoming empty and between empty-server backups. Accepts 0 or greater. |
+| `set backup-server-empty-max <count>` | Dedicated servers only: maximum successful scheduled backups per continuous empty period. `0` means unlimited; accepts 0 or greater. |
 | `set load-countdown-seconds <seconds>` | Set the snapshot-load countdown, in seconds. Defaults to 10; accepts 0 or greater.   |
 | `set restore-directory`           | Target directory for restored snapshots.  Useful for servers with limited tmp space.     |
 | `set remote-retention-policy`     | Set retention policy for remote snapshots.                                               |

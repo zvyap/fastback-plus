@@ -107,9 +107,9 @@ class RepoImpl implements Repo {
     // 'do' methods - implement higher-level command-oriented logic.
 
     @Override
-    public void doCommitAndPush(final UserLogger ulog, final SnapshotMetadata metadata) {
+    public boolean doCommitAndPush(final UserLogger ulog, final SnapshotMetadata metadata) {
         requireNonNull(metadata);
-        if (!isNativeOk(this.getConfig(), ulog, false)) return;
+        if (!isNativeOk(this.getConfig(), ulog, false)) return false;
         checkIndexLock(ulog);
         broadcastBackupNotice();
         final long start = System.nanoTime();
@@ -120,31 +120,32 @@ class RepoImpl implements Repo {
             Executor.checkCancelled();
             syslog().error(e);
             ulog.message(styledLocalized("fastback.chat.commit-failed", ERROR));
-            return;
+            return false;
         }
         try {
             if (!getConfig().isSet(REMOTE_PUSH_URL)) {
                 ulog.message(styledLocalized("fastback.chat.remote-no-url", ERROR));
-                return;
+                return false;
             }
             PushUtils.doPush(newSid, this, ulog);
         } catch (IOException | ProcessException e) {
             Executor.checkCancelled();
             ulog.message(styledLocalized("fastback.chat.push-failed", ERROR));
             syslog().error(e);
-            return;
+            return false;
         } finally {
             invalidateSnapshots();
         }
         Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
         broadcastBackupDone(newSid, metadata, elapsedMillis(start));
+        return true;
     }
 
     @Override
-    public void doCommitSnapshot(final UserLogger ulog, final SnapshotMetadata metadata) {
+    public boolean doCommitSnapshot(final UserLogger ulog, final SnapshotMetadata metadata) {
         requireNonNull(metadata);
-        if (!isNativeOk(this.getConfig(), ulog, false)) return;
+        if (!isNativeOk(this.getConfig(), ulog, false)) return false;
         checkIndexLock(ulog);
         broadcastBackupNotice();
         final long start = System.nanoTime();
@@ -155,11 +156,12 @@ class RepoImpl implements Repo {
             Executor.checkCancelled();
             ulog.message(styledLocalized("fastback.chat.commit-failed", ERROR));
             syslog().error(e);
-            return;
+            return false;
         }
         Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
         broadcastBackupDone(newSid, metadata, elapsedMillis(start));
+        return true;
     }
 
     @Override

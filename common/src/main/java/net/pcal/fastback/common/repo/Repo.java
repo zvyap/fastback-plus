@@ -56,24 +56,24 @@ public interface Repo extends AutoCloseable {
     //
     // By convention, methods prefixed with 'do' provide the 'guts' of a flow
     // initiated by a cli command or scheduled action.  They're expected to handle
-    // everything: errors, user feedback.  A method prefixed with 'do' must return
-    // void and must not throw checked exceptions.
+    // everything: errors, user feedback. Backup methods return whether the requested
+    // backup completed, so automatic scheduling can count successful backups.
     //
     // q: should they also be responsible for thread management?  probably yes
     // Obviously there are still some TODOs here to align with this convention.
     //
 
-    default void doCommitAndPush(UserLogger ulog) throws IOException {
-        doCommitAndPush(ulog, SnapshotMetadata.AUTOMATIC);
+    default boolean doCommitAndPush(UserLogger ulog) throws IOException {
+        return doCommitAndPush(ulog, SnapshotMetadata.AUTOMATIC);
     }
 
-    void doCommitAndPush(UserLogger ulog, SnapshotMetadata metadata) throws IOException;
+    boolean doCommitAndPush(UserLogger ulog, SnapshotMetadata metadata) throws IOException;
 
-    default void doCommitSnapshot(UserLogger ulog) throws IOException {
-        doCommitSnapshot(ulog, SnapshotMetadata.AUTOMATIC);
+    default boolean doCommitSnapshot(UserLogger ulog) throws IOException {
+        return doCommitSnapshot(ulog, SnapshotMetadata.AUTOMATIC);
     }
 
-    void doCommitSnapshot(UserLogger ulog, SnapshotMetadata metadata) throws IOException;
+    boolean doCommitSnapshot(UserLogger ulog, SnapshotMetadata metadata) throws IOException;
 
     Collection<SnapshotId> doLocalPrune(UserLogger ulog) throws IOException;
 

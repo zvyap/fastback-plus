@@ -37,39 +37,33 @@ public enum SchedulableAction {
 
     NONE("none") {
         @Override
-        public Callable<Void> getTask(final Repo repo, final UserLogger ulog) {
-            return () -> null;
+        public Callable<Boolean> getTask(final Repo repo, final UserLogger ulog) {
+            return () -> false;
         }
     },
 
     LOCAL("local") {
         @Override
-        public Callable<Void> getTask(final Repo repo, final UserLogger ulog) {
-            return () -> {
-                repo.doCommitSnapshot(ulog);
-                return null;
-            };
+        public Callable<Boolean> getTask(final Repo repo, final UserLogger ulog) {
+            return () -> repo.doCommitSnapshot(ulog);
         }
     },
 
     FULL("full") {
         @Override
-        public Callable<Void> getTask(final Repo repo, final UserLogger ulog) {
-            return () -> {
-                repo.doCommitAndPush(ulog);
-                return null;
-            };
+        public Callable<Boolean> getTask(final Repo repo, final UserLogger ulog) {
+            return () -> repo.doCommitAndPush(ulog);
         }
     },
 
     FULL_GC("full-gc") {
         @Override
-        public Callable<Void> getTask(final Repo repo, final UserLogger ulog) {
+        public Callable<Boolean> getTask(final Repo repo, final UserLogger ulog) {
             return () -> {
-                repo.doCommitAndPush(ulog);
+                if (!repo.doCommitAndPush(ulog)) return false;
                 repo.doLocalPrune(ulog);
                 repo.doGc(ulog);
-                return null;
+                return true;
             };
         }
     };
@@ -104,6 +98,6 @@ public enum SchedulableAction {
         return this.configValue;
     }
 
-    public abstract Callable<?> getTask(Repo repo, UserLogger ulog);
+    public abstract Callable<Boolean> getTask(Repo repo, UserLogger ulog);
 }
 

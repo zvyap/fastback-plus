@@ -22,6 +22,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 
@@ -45,6 +46,20 @@ public class NeoForgeModInitializer {
                     mod().onWorldStart(event.getServer()));
             NeoForge.EVENT_BUS.addListener((ServerStoppedEvent event) ->
                     mod().onWorldStop());
+            NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent event) -> {
+                final var server = event.getEntity().level().getServer();
+                server.execute(() -> mod().onServerPlayersChanged(server, false));
+            });
+            NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedOutEvent event) -> {
+                final var server = event.getEntity().level().getServer();
+                final var departingPlayer = event.getEntity();
+                server.execute(() -> {
+                    // NeoForge notifies before vanilla removes the departing player.
+                    final boolean empty = server.getPlayerList().getPlayers().stream()
+                            .allMatch(player -> player == departingPlayer);
+                    mod().onServerPlayersChanged(server, empty);
+                });
+            });
         }
     }
 }

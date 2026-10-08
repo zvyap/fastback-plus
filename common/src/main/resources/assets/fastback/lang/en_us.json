@@ -22,6 +22,7 @@
   "fastback.help.command.remote-restore"         : "Restore a remote snapshot.",
   "fastback.help.command.restore"                : "Restore a backup snapshot.",
   "fastback.help.command.set"                    : "Change configuration settings.",
+  "fastback.help.server-empty-settings"          : "Dedicated server settings: /backup set backup-server-empty-action [none|local|full|full-gc], backup-server-empty-wait [minutes], backup-server-empty-max [count]. Wait/count must be 0 or greater; count 0 is unlimited. Action none disables scheduled backups while empty.",
   "fastback.help.command.set-autoback-action"    : "Set an action to perform during auto-backups.",
   "fastback.help.command.set-autoback-wait"      : "Set the minimum number of minutes to wait between auto-backups.",
   "fastback.help.command.set-remote"             : "Set the url for remote backups.",

@@ -84,6 +84,9 @@ public interface Mod {
      */
     void onWorldStop();
 
+    /** Loader player events report occupancy, including transitions between autosaves. */
+    void onServerPlayersChanged(MinecraftServer server, boolean empty);
+
     /**
      * Allows loaders to plugin HUD rendering.
      */
