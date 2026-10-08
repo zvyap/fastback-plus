@@ -39,4 +39,4 @@ jobs:
             "fabric/build/libs/fastback-fabric-${RELEASE_TAG}.jar" \
             "neoforge/build/libs/fastback-neoforge-${RELEASE_TAG}.jar" \
             --verify-tag --title "$RELEASE_TAG" --generate-notes \
-            --notes "FastBack for Minecraft 26.3. Includes dedicated server snapshot loading and English fallback text for translatable messages."
+            --notes-file CHANGELOG.md
