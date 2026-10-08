@@ -52,7 +52,7 @@ class AutosaveListener implements Runnable {
 
     private final ServerEmptyBackupState serverEmpty = new ServerEmptyBackupState();
     private final LongSupplier clock;
-    private long lastBackupTime;
+    private volatile long lastBackupTime;
 
     AutosaveListener() {
         this(System::nanoTime);
@@ -70,6 +70,12 @@ class AutosaveListener implements Runnable {
 
     void onServerPlayersChanged(boolean empty) {
         this.serverEmpty.update(empty, this.clock.getAsLong());
+    }
+
+    void onManualBackupCompleted() {
+        final long now = this.clock.getAsLong();
+        this.lastBackupTime = now;
+        this.serverEmpty.refreshWait(now);
     }
 
     @Override

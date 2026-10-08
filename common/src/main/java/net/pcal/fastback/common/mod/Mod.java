@@ -108,6 +108,9 @@ public interface Mod {
      */
     void autoSaveCompleted();
 
+    /** Refresh the automatic-backup wait after a successful player backup. */
+    void onManualBackupCompleted();
+
     /**
      * Called from the shutdown message screen mixins to render additional text.
      */

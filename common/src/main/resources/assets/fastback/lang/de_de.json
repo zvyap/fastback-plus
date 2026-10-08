@@ -129,5 +129,6 @@
   "fastback.broadcast.done"                     : "Backup abgeschlossen: %s • Snapshot: %s • Backups insgesamt: %s",
   "fastback.broadcast.done-elapsed"             : "Backup abgeschlossen. Dauer: %s (%s / %s).",
   "fastback.broadcast.completed-elapsed"        : "Backup abgeschlossen. Dauer: %s (%s / %s).",
+  "fastback.broadcast.completed-sizes"          : "Backup abgeschlossen. Dauer: %s (%s / %s) [%s].",
   "fastback.message.custom"                     : "%s"
 }

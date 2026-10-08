@@ -11,6 +11,13 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.FileVisitResult;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -21,6 +28,50 @@ final class BackupCompletion {
 
     private static final Pattern LFS_OID = Pattern.compile("(?m)^oid sha256:[a-f0-9]{64}$");
     private static final Pattern LFS_SIZE = Pattern.compile("(?m)^size ([0-9]+)$");
+    private static final Pattern LFS_OBJECT = Pattern.compile("[a-f0-9]{64}");
+
+    record LfsStorage(Path objects, long bytes) {
+        long addedBytes() throws IOException {
+            return Math.max(0, lfsSize(objects) - bytes);
+        }
+    }
+
+    static LfsStorage lfsStorage(Repository repository) throws IOException {
+        final String configured = repository.getConfig().getString("lfs", null, "storage");
+        final Path objects = repository.getDirectory().toPath()
+                .resolve(configured == null || configured.isBlank() ? "lfs" : configured).resolve("objects");
+        return new LfsStorage(objects, lfsSize(objects));
+    }
+
+    static long lfsSize(Path objects) throws IOException {
+        Executor.checkCancelled();
+        try {
+            if (!Files.readAttributes(objects, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS).isDirectory()) {
+                throw new IOException("LFS object storage is not a directory");
+            }
+        } catch (NoSuchFileException missing) {
+            return 0;
+        }
+        // ponytail: scan retained object metadata; track new OIDs if large histories make this too slow.
+        final long[] bytes = {0};
+        Files.walkFileTree(objects, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+                Executor.checkCancelled();
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                Executor.checkCancelled();
+                if (attributes.isRegularFile() && LFS_OBJECT.matcher(file.getFileName().toString()).matches()) {
+                    bytes[0] = Math.addExact(bytes[0], attributes.size());
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return bytes[0];
+    }
 
     static long snapshotSize(Repository repository, SnapshotId snapshot) throws IOException {
         final ObjectId commitId = repository.resolve("refs/heads/" + snapshot.getBranchName());

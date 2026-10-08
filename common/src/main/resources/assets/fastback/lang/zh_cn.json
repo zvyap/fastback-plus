@@ -129,5 +129,6 @@
   "fastback.broadcast.done"                     : "备份完成：%s • 快照大小：%s • 备份总大小：%s",
   "fastback.broadcast.done-elapsed"             : "备份完成。用时 %s（%s / %s）。",
   "fastback.broadcast.completed-elapsed"        : "备份完成。用时 %s（%s / %s）。",
+  "fastback.broadcast.completed-sizes"          : "备份完成。用时 %s（%s / %s）[%s]。",
   "fastback.message.custom"                     : "%s"
 }

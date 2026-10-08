@@ -113,5 +113,6 @@
   "fastback.broadcast.done"                     : "Copia completada: %s • Instantánea: %s • Total de copias: %s",
   "fastback.broadcast.done-elapsed"             : "Copia completada. Tiempo: %s (%s / %s).",
   "fastback.broadcast.completed-elapsed"        : "Copia completada. Tiempo: %s (%s / %s).",
+  "fastback.broadcast.completed-sizes"          : "Copia completada. Tiempo: %s (%s / %s) [%s].",
   "fastback.message.custom"                     : "%s"
 }

@@ -35,8 +35,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
+          awk -v heading="## ${RELEASE_TAG} - " '
+            index($0, heading) == 1 { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          test -s release-notes.md
           gh release create "$RELEASE_TAG" \
             "fabric/build/libs/fastback-fabric-${RELEASE_TAG}.jar" \
             "neoforge/build/libs/fastback-neoforge-${RELEASE_TAG}.jar" \
             --verify-tag --title "$RELEASE_TAG" --generate-notes \
-            --notes-file CHANGELOG.md
+            --notes-file release-notes.md

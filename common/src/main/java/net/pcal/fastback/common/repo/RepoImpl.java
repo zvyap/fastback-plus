@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CancellationException;
 
 import static java.util.Objects.requireNonNull;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_ENABLED;
@@ -69,11 +70,11 @@ import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
 import static net.pcal.fastback.common.logging.UserMessage.styledRaw;
 import static net.pcal.fastback.common.mod.Mod.mod;
 import static net.pcal.fastback.common.mod.UserMessageUtil.configuredMessage;
+import static net.pcal.fastback.common.mod.UserMessageUtil.formatSize;
 import static net.pcal.fastback.common.repo.PushUtils.jgit_lsRemote;
 import static net.pcal.fastback.common.repo.PushUtils.native_lsRemote;
 import static net.pcal.fastback.common.utils.EnvironmentUtils.isNativeOk;
 import static org.eclipse.jgit.util.FileUtils.RETRY;
-import static org.apache.commons.io.FileUtils.byteCountToDisplaySize;
 import static org.apache.commons.io.FileUtils.sizeOfDirectory;
 
 /**
@@ -111,7 +112,8 @@ class RepoImpl implements Repo {
         requireNonNull(metadata);
         if (!isNativeOk(this.getConfig(), ulog, false)) return false;
         checkIndexLock(ulog);
-        broadcastBackupNotice();
+        broadcastBackupNotice(ulog);
+        final BackupCompletion.LfsStorage lfsBefore = lfsStorageBeforeBackup();
         final long start = System.nanoTime();
         final SnapshotId newSid;
         try {
@@ -122,6 +124,7 @@ class RepoImpl implements Repo {
             ulog.message(styledLocalized("fastback.chat.commit-failed", ERROR));
             return false;
         }
+        final Long addedSize = addedLfsBytes(lfsBefore);
         try {
             if (!getConfig().isSet(REMOTE_PUSH_URL)) {
                 ulog.message(styledLocalized("fastback.chat.remote-no-url", ERROR));
@@ -138,7 +141,7 @@ class RepoImpl implements Repo {
         }
         Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
-        broadcastBackupDone(newSid, metadata, elapsedMillis(start));
+        backupCompleted(ulog, newSid, metadata, elapsedMillis(start), addedSize);
         return true;
     }
 
@@ -147,7 +150,8 @@ class RepoImpl implements Repo {
         requireNonNull(metadata);
         if (!isNativeOk(this.getConfig(), ulog, false)) return false;
         checkIndexLock(ulog);
-        broadcastBackupNotice();
+        broadcastBackupNotice(ulog);
+        final BackupCompletion.LfsStorage lfsBefore = lfsStorageBeforeBackup();
         final long start = System.nanoTime();
         final SnapshotId newSid;
         try {
@@ -160,7 +164,7 @@ class RepoImpl implements Repo {
         }
         Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
-        broadcastBackupDone(newSid, metadata, elapsedMillis(start));
+        backupCompleted(ulog, newSid, metadata, elapsedMillis(start), addedLfsBytes(lfsBefore));
         return true;
     }
 
@@ -442,11 +446,14 @@ class RepoImpl implements Repo {
         }
     }
 
-    private void broadcastBackupNotice() {
+    private void broadcastBackupNotice(UserLogger ulog) {
         if (!getConfig().getBoolean(BROADCAST_ENABLED)) return;
         final UserMessage m;
         final String configuredMessage = getConfig().getString(BROADCAST_MESSAGE);
-        if (configuredMessage != null) {
+        final String player = ulog.getPlayerName();
+        if (player != null) {
+            m = styledLocalized("fastback.broadcast.manual-backup", BROADCAST, player);
+        } else if (configuredMessage != null) {
             m = configuredMessage(configuredMessage, Map.of(), BROADCAST);
         } else {
             m = styledLocalized("fastback.broadcast.message", BROADCAST);
@@ -458,25 +465,59 @@ class RepoImpl implements Repo {
         return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - since);
     }
 
+    private static boolean usesSize(String template, String name) {
+        return template == null || template.contains("{" + name + "}") || template.contains("{" + name + ":");
+    }
+
+    private BackupCompletion.LfsStorage lfsStorageBeforeBackup() {
+        if (!getConfig().getBoolean(BROADCAST_DONE_ENABLED) ||
+                !usesSize(getConfig().getString(BROADCAST_DONE_MESSAGE), "added_size")) return null;
+        try {
+            return BackupCompletion.lfsStorage(jgit.getRepository());
+        } catch (CancellationException cancelled) {
+            throw cancelled;
+        } catch (Exception unavailable) {
+            Executor.checkCancelled();
+            syslog().warn("Unable to measure LFS storage before backup.");
+            syslog().debug(unavailable);
+            return null;
+        }
+    }
+
+    private Long addedLfsBytes(BackupCompletion.LfsStorage before) {
+        if (before == null) return null;
+        try {
+            return before.addedBytes();
+        } catch (CancellationException cancelled) {
+            throw cancelled;
+        } catch (Exception unavailable) {
+            Executor.checkCancelled();
+            syslog().warn("Unable to measure added LFS storage.");
+            syslog().debug(unavailable);
+            return null;
+        }
+    }
+
     /** Called by the backup worker after saving (and, for full backups, pushing) succeeds. */
-    private void broadcastBackupDone(SnapshotId snapshot, SnapshotMetadata metadata, long elapsedMillis) {
+    private void backupCompleted(UserLogger ulog, SnapshotId snapshot, SnapshotMetadata metadata, long elapsedMillis, Long addedSize) {
+        if (ulog.getPlayerName() != null) mod().onManualBackupCompleted();
         if (!getConfig().getBoolean(BROADCAST_DONE_ENABLED)) return;
         final String elapsed = BackupCompletion.elapsedText(elapsedMillis);
         final String template = getConfig().getString(BROADCAST_DONE_MESSAGE);
-        String snapshotSize = "-";
-        String totalSize = "-";
-        if (template == null || template.contains("{snapshot_size}")) {
+        long snapshotSize = -1;
+        long totalSize = -1;
+        if (usesSize(template, "snapshot_size") || usesSize(template, "current_size")) {
             try {
-                snapshotSize = byteCountToDisplaySize(BackupCompletion.snapshotSize(jgit.getRepository(), snapshot));
+                snapshotSize = BackupCompletion.snapshotSize(jgit.getRepository(), snapshot);
             } catch (Exception unavailable) {
                 Executor.checkCancelled();
                 syslog().warn("Unable to calculate completed snapshot size.");
                 syslog().debug(unavailable);
             }
         }
-        if (template == null || template.contains("{total_size}")) {
+        if (usesSize(template, "total_size")) {
             try {
-                totalSize = byteCountToDisplaySize(sizeOfDirectory(getDirectory()));
+                totalSize = sizeOfDirectory(getDirectory());
             } catch (Exception unavailable) {
                 Executor.checkCancelled();
                 syslog().warn("Unable to calculate total backup size.");
@@ -486,18 +527,21 @@ class RepoImpl implements Repo {
         Executor.checkCancelled();
         final UserMessage message;
         if (template == null) {
-            message = styledLocalized("fastback.broadcast.completed-elapsed", BROADCAST,
+            message = styledLocalized("fastback.broadcast.completed-sizes", BROADCAST,
                     Component.literal(elapsed).withStyle(AQUA),
-                    Component.literal(snapshotSize).withStyle(GOLD),
-                    Component.literal(totalSize).withStyle(GOLD));
+                    Component.literal(formatSize(snapshotSize, 2)).withStyle(GOLD),
+                    Component.literal(formatSize(totalSize, 2)).withStyle(GOLD),
+                    Component.literal(addedSize == null ? "-" : "+" + formatSize(addedSize, 0)).withStyle(GOLD));
         } else {
             message = configuredMessage(template, Map.of(
                     "snapshot", snapshot.getShortName(),
-                    "snapshot_size", snapshotSize,
-                    "total_size", totalSize,
                     "elapsed", elapsed,
                     "remark", metadata.remark() == null || metadata.remark().isBlank() ? "-" : metadata.remark(),
-                    "creator", metadata.creator() == null ? "automatic" : metadata.creator()), BROADCAST);
+                    "creator", metadata.creator() == null ? "automatic" : metadata.creator()), Map.of(
+                    "snapshot_size", snapshotSize,
+                    "current_size", snapshotSize,
+                    "total_size", totalSize,
+                    "added_size", addedSize == null ? -1 : addedSize), BROADCAST);
         }
         mod().sendBroadcast(message);
     }

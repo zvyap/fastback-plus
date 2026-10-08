@@ -25,6 +25,10 @@ final class ServerEmptyBackupState {
         return this.empty ? this.generation : -1;
     }
 
+    synchronized void refreshWait(long now) {
+        this.lastBackupTime = now;
+    }
+
     synchronized boolean isDue(long period, long now, int waitMinutes, int max) {
         return this.empty && this.generation == period && waitMinutes >= 0 && max >= 0 &&
                 (max == 0 || this.backups < max) &&

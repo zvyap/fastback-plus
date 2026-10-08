@@ -46,4 +46,9 @@ class CommandLogger implements UserLogger {
     public void update(final UserMessage message) {
         mod().setHudText(message);
     }
+
+    @Override
+    public String getPlayerName() {
+        return this.scs.getPlayer() == null ? null : this.scs.getTextName();
+    }
 }

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.36.0+26.3.0 - 2026-10-09
+
+For Minecraft 26.3, with Fabric and NeoForge builds. Requires Java 25.
+
+### Added
+
+- Backup completion notices now include newly stored local Git LFS bytes:
+  `Backup completed. Used 5 seconds (228.00 MB / 5.00 GB) [+140 MB].`
+  Shared or reused LFS content adds zero bytes; unavailable statistics do not fail
+  a completed backup.
+- Size placeholders support decimal precision, such as `{current_size:2}` and
+  `{total_size:2}`. `current_size` aliases `snapshot_size`; `{added_size}` reports
+  new LFS storage. The default current and total sizes use two decimals, while
+  added size uses whole units. Existing plain placeholders remain compatible.
+- Player-triggered backups announce `<player> is starting a manual backup.`
+  Console and automatic backups retain their existing starting notices.
+
+### Improved
+
+- Successful player backups refresh the automatic-backup wait from completion,
+  including the empty-server wait, without consuming or resetting its backup
+  limit. Failed or cancelled backups leave the scheduling wait unchanged.
+- Completion size formatting preserves message colors and styles, and supports
+  the existing translated notices and English fallback for older clients.
+
+[Full changelog](https://github.com/zvyap/fastback-plus/compare/0.35.2%2B26.3.0...0.36.0%2B26.3.0)
+
 ## 0.35.2+26.3.0 - 2026-10-08
 
 For Minecraft 26.3, with Fabric and NeoForge builds. Requires Java 25.

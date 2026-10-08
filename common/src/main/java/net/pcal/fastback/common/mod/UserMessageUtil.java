@@ -29,9 +29,12 @@ import net.pcal.fastback.common.logging.UserMessage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
@@ -51,6 +54,8 @@ public class UserMessageUtil {
 
     private static final Map<String, String> DEFAULT_TRANSLATIONS = loadDefaultTranslations();
     private static final Pattern HEX_COLOR = Pattern.compile("#[a-fA-F0-9]{6}");
+    private static final Pattern SIZE_TOKEN = Pattern.compile("((?:current|snapshot|total|added)_size)(?::([0-9]))?");
+    private static final String[] SIZE_UNITS = {"bytes", "KB", "MB", "GB", "TB", "PB", "EB"};
 
     public static Component messageToText(final UserMessage m) {
         final MutableComponent out;
@@ -69,6 +74,11 @@ public class UserMessageUtil {
     /** Parse configuration tokens once; substituted player text remains literal. */
     public static UserMessage configuredMessage(String template, Map<String, String> values,
                                                 UserMessage.UserMessageStyle messageStyle) {
+        return configuredMessage(template, values, Map.of(), messageStyle);
+    }
+
+    public static UserMessage configuredMessage(String template, Map<String, String> values,
+                                                Map<String, Long> sizes, UserMessage.UserMessageStyle messageStyle) {
         final Style base = messageStyle(messageStyle);
         final MutableComponent text = Component.empty().setStyle(base);
         Style style = base;
@@ -84,7 +94,17 @@ public class UserMessageUtil {
             if (character != '}' || depth == 0 || --depth != 0) continue;
             text.append(Component.literal(template.substring(offset, start)).setStyle(style));
             final String token = template.substring(start + 1, end);
-            if (values.containsKey(token)) {
+            final Matcher sizeToken = SIZE_TOKEN.matcher(token);
+            Long size = null;
+            if (sizeToken.matches()) {
+                final String key = sizeToken.group(1);
+                size = sizes.get(key);
+                if (size == null && "current_size".equals(key)) size = sizes.get("snapshot_size");
+            }
+            if (size != null) {
+                final int precision = sizeToken.group(2) == null ? 0 : Integer.parseInt(sizeToken.group(2));
+                text.append(Component.literal(formatSize(size, precision)).setStyle(style));
+            } else if (values.containsKey(token)) {
                 text.append(Component.literal(values.get(token)).setStyle(style));
             } else if (HEX_COLOR.matcher(token).matches()) {
                 style = style.withColor(Integer.parseInt(token.substring(1), 16));
@@ -114,6 +134,21 @@ public class UserMessageUtil {
         }
         text.append(Component.literal(template.substring(offset)).setStyle(style));
         return UserMessage.styledLocalized("fastback.message.custom", messageStyle, text);
+    }
+
+    /** Use binary units; plain tokens retain the legacy whole-unit formatting. */
+    public static String formatSize(long bytes, int precision) {
+        if (precision < 0 || precision > 9) throw new IllegalArgumentException("Size precision must be between 0 and 9");
+        if (bytes < 0) return "-";
+        if (precision == 0 || bytes < 1024) return org.apache.commons.io.FileUtils.byteCountToDisplaySize(bytes);
+        long divisor = 1;
+        int unit = 0;
+        while (unit + 1 < SIZE_UNITS.length && bytes >= divisor * 1024) {
+            divisor *= 1024;
+            unit++;
+        }
+        return BigDecimal.valueOf(bytes).divide(BigDecimal.valueOf(divisor), precision, RoundingMode.HALF_UP)
+                .toPlainString() + " " + SIZE_UNITS[unit];
     }
 
     private static Style messageStyle(UserMessage.UserMessageStyle style) {

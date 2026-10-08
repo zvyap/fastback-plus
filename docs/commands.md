@@ -54,15 +54,15 @@ configuration changes, and server lifecycle events invalidate the cache; the
 snapshot index also refreshes after 30 seconds.
 
 Successful backups broadcast their elapsed time, snapshot size, and total backup
-storage by default: `Backup completed. Used 5 seconds (228 MB / 5 GB).`
+storage by default: `Backup completed. Used 5 seconds (228.00 MB / 5.00 GB) [+140 MB].`
 Disable this completion notice independently of the starting
 notice with `/backup set broadcast-done-enabled false`. To customize it:
 
 ```text
-/backup set broadcast-done-message Backup completed. Used {elapsed} ({snapshot_size} / {total_size}).
+/backup set broadcast-done-message Backup completed. Used {elapsed} ({current_size:2} / {total_size:2}) [+{added_size}].
 ```
 
-Supported placeholders are `{elapsed}`, `{snapshot}`, `{snapshot_size}`, `{total_size}`,
+Supported placeholders are `{elapsed}`, `{snapshot}`, `{current_size}`, `{snapshot_size}`, `{total_size}`, `{added_size}`,
 `{creator}`, and `{remark}`. Elapsed time is the backup duration, including any
 remote push, expressed in words; it excludes the subsequent size lookup.
 Snapshot size is the logical size of the committed
@@ -70,6 +70,25 @@ files, including the original size of Git LFS files. Total size is the physical
 storage used by the local Git repository, including its shared history and LFS
 objects. These sizes differ because backups share unchanged data. Unavailable
 sizes display `-`; a size lookup failure does not fail a completed backup.
+
+`current_size` and `snapshot_size` are aliases for the saved snapshot's logical
+size. `added_size` is the increase in locally stored Git LFS object bytes during
+the current snapshot commit, excluding ordinary Git objects and temporary files.
+Content already in the LFS store is shared and adds zero bytes. A backup without
+new LFS objects displays `+0 bytes`. A failed lookup displays `[-]` in the default
+notice. Custom `lfs.storage` locations are respected.
+
+Size placeholders accept a decimal precision from 0 to 9, for example
+`{current_size:2}`, `{total_size:2}`, or `{added_size:1}`. Units are selected
+automatically using 1024 bytes per KB, MB, GB, and so on. The default notice uses
+two decimals for current and total size and whole units for added size. Plain
+placeholders and `:0` retain the existing whole-unit formatting; bytes remain
+whole numbers. Unknown placeholders or invalid precision remain literal text.
+
+When a player starts `/backup local` or `/backup full`, the starting notice is
+`<player> is starting a manual backup.` Console and automatic backups keep the
+existing starting notice, including any configured `broadcast-message`.
+`broadcast-enabled` controls starting notices for all backup sources.
 
 Both `broadcast-message` (the starting notice) and `broadcast-done-message`
 support color and style tokens. Use Minecraft color names such as `{red}`,
@@ -80,7 +99,7 @@ message's default style. Unknown tokens remain literal text. For example:
 
 ```text
 /backup set broadcast-message {gold}{bold}Backup starting{reset}...
-/backup set broadcast-done-message {green}Backup completed. {reset}Used {aqua}{elapsed}{reset} ({#FFAA00}{snapshot_size}{reset} / {gold}{total_size}{reset}).
+/backup set broadcast-done-message {green}Backup completed. {reset}Used {aqua}{elapsed}{reset} ({#FFAA00}{current_size:2}{reset} / {gold}{total_size:2}{reset}) [+{added_size}].
 ```
 
 The completion placeholders above can be combined with formatting tokens;

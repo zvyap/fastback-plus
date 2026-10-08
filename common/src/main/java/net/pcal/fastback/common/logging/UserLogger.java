@@ -46,6 +46,11 @@ public interface UserLogger extends AutoCloseable {
      */
     void update(UserMessage message);
 
+    /** Player who issued the command, or null for console and automatic operations. */
+    default String getPlayerName() {
+        return null;
+    }
+
     @Override
     default void close() {
         mod().clearHudText();

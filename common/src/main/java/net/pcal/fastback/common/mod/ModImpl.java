@@ -341,6 +341,11 @@ class ModImpl implements Mod {
     }
 
     @Override
+    public void onManualBackupCompleted() {
+        this.autoSaveListener.onManualBackupCompleted();
+    }
+
+    @Override
     public void renderMessageScreen(GuiGraphicsExtractor drawContext) {
         if (this.clientHelper != null) {
             this.clientHelper.renderMessageScreen(drawContext);

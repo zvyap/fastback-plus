@@ -41,6 +41,12 @@ run less-frequently:
 
 This sets the minimum wait time between auto-backups.
 
+A successful player-triggered `/backup local` or `/backup full` refreshes this
+wait from its completion time, even if backup broadcasts are disabled. Failed
+or cancelled attempts do not postpone the next automatic backup. If the server
+became empty while the manual backup was running, its empty-server wait is also
+refreshed; the manual backup does not consume the empty-server backup limit.
+
 So, for example, setting `[minutes]` 
 to 120 will cause backups to run *roughly* every two hours; the exact timing will depend 
 on when the next autosave runs.

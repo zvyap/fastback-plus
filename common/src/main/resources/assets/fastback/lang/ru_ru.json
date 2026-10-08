@@ -100,5 +100,6 @@
   "fastback.broadcast.done"                     : "Копирование завершено: %s • Снимок: %s • Всего копий: %s",
   "fastback.broadcast.done-elapsed"             : "Резервное копирование завершено. Затрачено %s (%s / %s).",
   "fastback.broadcast.completed-elapsed"        : "Резервное копирование завершено. Затрачено %s (%s / %s).",
+  "fastback.broadcast.completed-sizes"          : "Резервное копирование завершено. Затрачено %s (%s / %s) [%s].",
   "fastback.message.custom"                     : "%s"
 }
