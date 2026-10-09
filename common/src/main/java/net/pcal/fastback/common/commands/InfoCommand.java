@@ -56,9 +56,9 @@ import static net.pcal.fastback.common.config.OtherConfigKey.REMOTE_PUSH_URL;
 import static net.pcal.fastback.common.logging.UserLogger.ulog;
 import static net.pcal.fastback.common.logging.UserMessage.raw;
 import static net.pcal.fastback.common.mod.Mod.mod;
+import static net.pcal.fastback.common.mod.UserMessageUtil.formatSize;
 import static net.pcal.fastback.common.repo.RepoFactory.rf;
 import static net.pcal.fastback.common.utils.EnvironmentUtils.isNativeOk;
-import static org.apache.commons.io.FileUtils.byteCountToDisplaySize;
 import static org.apache.commons.io.FileUtils.sizeOfDirectory;
 
 // TODO move this to Repo.doInfo
@@ -94,8 +94,8 @@ enum InfoCommand implements Command {
                         // FIXME? this could be implemented more efficiently
                         final long backupSize = sizeOfDirectory(repo.getDirectory());
                         final long worldSize = sizeOfDirectory(repo.getWorkTree()) - backupSize;
-                        ulog.message(UserMessage.localized("fastback.chat.info-world-size", byteCountToDisplaySize(worldSize)));
-                        ulog.message(UserMessage.localized("fastback.chat.info-backup-size", byteCountToDisplaySize(backupSize)));
+                        ulog.message(UserMessage.localized("fastback.chat.info-world-size", formatSize(worldSize, 0)));
+                        ulog.message(UserMessage.localized("fastback.chat.info-backup-size", formatSize(backupSize, 0)));
 
                         show(IS_BACKUP_ENABLED, conf::getBoolean, ulog);
                         show(REMOTE_PUSH_URL, conf::getString, ulog);

@@ -49,9 +49,9 @@ import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.NATI
 import static net.pcal.fastback.common.logging.UserMessage.raw;
 import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
 import static net.pcal.fastback.common.logging.UserMessage.styledRaw;
+import static net.pcal.fastback.common.mod.UserMessageUtil.formatSize;
 import static net.pcal.fastback.common.repo.PushUtils.isTempBranch;
 import static net.pcal.fastback.common.utils.ProcessUtils.doExec;
-import static org.apache.commons.io.FileUtils.byteCountToDisplaySize;
 import static org.apache.commons.io.FileUtils.sizeOfDirectory;
 import static org.eclipse.jgit.api.ListBranchCommand.ListMode.ALL;
 
@@ -94,7 +94,7 @@ abstract class ReclamationUtils {
         syslog().debug("Stats before gc:");
         syslog().debug(String.valueOf(repo.getJGit().gc().getStatistics()));
         final long sizeBeforeBytes = sizeOfDirectory(gitDir);
-        syslog().info("Backup size before gc: " + byteCountToDisplaySize(sizeBeforeBytes));
+        syslog().info("Backup size before gc: " + formatSize(sizeBeforeBytes, 0));
         if (config.getBoolean(IS_REFLOG_DELETION_ENABLED)) {
             // reflogs aren't very useful in our case and cause old snapshots to get retained
             // longer than people expect.
@@ -139,7 +139,7 @@ abstract class ReclamationUtils {
         syslog().debug("Stats after gc:");
         syslog().debug("" + repo.getJGit().gc().getStatistics());
         final long sizeAfterBytes = sizeOfDirectory(gitDir);
-        syslog().info("Backup size after gc: " + byteCountToDisplaySize(sizeAfterBytes));
+        syslog().info("Backup size after gc: " + formatSize(sizeAfterBytes, 0));
     }
 
     private static class GcProgressMonitor extends JGitPercentageProgressMonitor {

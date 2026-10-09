@@ -54,7 +54,7 @@ configuration changes, and server lifecycle events invalidate the cache; the
 snapshot index also refreshes after 30 seconds.
 
 Successful backups broadcast their elapsed time, snapshot size, and total backup
-storage by default: `Backup completed. Used 5 seconds (228.00 MB / 5.00 GB) [+140 MB].`
+storage by default: `Backup completed. Used 5 seconds (228.00MB / 5.00GB) [+140MB].`
 Disable this completion notice independently of the starting
 notice with `/backup set broadcast-done-enabled false`. To customize it:
 
@@ -75,14 +75,15 @@ sizes display `-`; a size lookup failure does not fail a completed backup.
 size. `added_size` is the increase in locally stored Git LFS object bytes during
 the current snapshot commit, excluding ordinary Git objects and temporary files.
 Content already in the LFS store is shared and adds zero bytes. A backup without
-new LFS objects displays `+0 bytes`. A failed lookup displays `[-]` in the default
+new LFS objects displays `+0bytes`. A failed lookup displays `[-]` in the default
 notice. Custom `lfs.storage` locations are respected.
 
 Size placeholders accept a decimal precision from 0 to 9, for example
 `{current_size:2}`, `{total_size:2}`, or `{added_size:1}`. Units are selected
-automatically using 1024 bytes per KB, MB, GB, and so on. The default notice uses
+automatically using 1024 bytes per KB, MB, GB, and so on, with no space before
+the unit in any size display. The default notice uses
 two decimals for current and total size and whole units for added size. Plain
-placeholders and `:0` retain the existing whole-unit formatting; bytes remain
+placeholders and `:0` retain whole-unit precision; bytes remain
 whole numbers. Unknown placeholders or invalid precision remain literal text.
 
 When a player starts `/backup local` or `/backup full`, the starting notice is

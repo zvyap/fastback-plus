@@ -136,11 +136,11 @@ public class UserMessageUtil {
         return UserMessage.styledLocalized("fastback.message.custom", messageStyle, text);
     }
 
-    /** Use binary units; plain tokens retain the legacy whole-unit formatting. */
+    /** Use binary units without spaces; plain tokens retain whole-unit precision. */
     public static String formatSize(long bytes, int precision) {
         if (precision < 0 || precision > 9) throw new IllegalArgumentException("Size precision must be between 0 and 9");
         if (bytes < 0) return "-";
-        if (precision == 0 || bytes < 1024) return org.apache.commons.io.FileUtils.byteCountToDisplaySize(bytes);
+        if (precision == 0 || bytes < 1024) return org.apache.commons.io.FileUtils.byteCountToDisplaySize(bytes).replace(" ", "");
         long divisor = 1;
         int unit = 0;
         while (unit + 1 < SIZE_UNITS.length && bytes >= divisor * 1024) {
@@ -148,7 +148,7 @@ public class UserMessageUtil {
             unit++;
         }
         return BigDecimal.valueOf(bytes).divide(BigDecimal.valueOf(divisor), precision, RoundingMode.HALF_UP)
-                .toPlainString() + " " + SIZE_UNITS[unit];
+                .toPlainString() + SIZE_UNITS[unit];
     }
 
     private static Style messageStyle(UserMessage.UserMessageStyle style) {
