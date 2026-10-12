@@ -113,6 +113,7 @@ class RepoImpl implements Repo {
         if (!isNativeOk(this.getConfig(), ulog, false)) return false;
         checkIndexLock(ulog);
         broadcastBackupNotice(ulog);
+        final long totalBefore = totalSizeBeforeBackup();
         final BackupCompletion.LfsStorage lfsBefore = lfsStorageBeforeBackup();
         final long start = System.nanoTime();
         final SnapshotId newSid;
@@ -141,7 +142,7 @@ class RepoImpl implements Repo {
         }
         Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
-        backupCompleted(ulog, newSid, metadata, elapsedMillis(start), addedSize);
+        backupCompleted(ulog, newSid, metadata, elapsedMillis(start), addedSize, totalBefore);
         return true;
     }
 
@@ -151,6 +152,7 @@ class RepoImpl implements Repo {
         if (!isNativeOk(this.getConfig(), ulog, false)) return false;
         checkIndexLock(ulog);
         broadcastBackupNotice(ulog);
+        final long totalBefore = totalSizeBeforeBackup();
         final BackupCompletion.LfsStorage lfsBefore = lfsStorageBeforeBackup();
         final long start = System.nanoTime();
         final SnapshotId newSid;
@@ -164,7 +166,7 @@ class RepoImpl implements Repo {
         }
         Executor.checkCancelled();
         ulog.message(localized("fastback.chat.backup-complete-elapsed", getDuration(start)));
-        backupCompleted(ulog, newSid, metadata, elapsedMillis(start), addedLfsBytes(lfsBefore));
+        backupCompleted(ulog, newSid, metadata, elapsedMillis(start), addedLfsBytes(lfsBefore), totalBefore);
         return true;
     }
 
@@ -469,6 +471,26 @@ class RepoImpl implements Repo {
         return template == null || template.contains("{" + name + "}") || template.contains("{" + name + ":");
     }
 
+    private long totalSizeBeforeBackup() {
+        if (!getConfig().getBoolean(BROADCAST_DONE_ENABLED)) return -1;
+        final String template = getConfig().getString(BROADCAST_DONE_MESSAGE);
+        return template != null && usesSize(template, "changed_size") ? totalBackupSize() : -1;
+    }
+
+    private long totalBackupSize() {
+        try {
+            Executor.checkCancelled();
+            return sizeOfDirectory(getDirectory());
+        } catch (CancellationException cancelled) {
+            throw cancelled;
+        } catch (Exception unavailable) {
+            Executor.checkCancelled();
+            syslog().warn("Unable to calculate total backup size.");
+            syslog().debug(unavailable);
+            return -1;
+        }
+    }
+
     private BackupCompletion.LfsStorage lfsStorageBeforeBackup() {
         if (!getConfig().getBoolean(BROADCAST_DONE_ENABLED) ||
                 !usesSize(getConfig().getString(BROADCAST_DONE_MESSAGE), "added_size")) return null;
@@ -499,7 +521,8 @@ class RepoImpl implements Repo {
     }
 
     /** Called by the backup worker after saving (and, for full backups, pushing) succeeds. */
-    private void backupCompleted(UserLogger ulog, SnapshotId snapshot, SnapshotMetadata metadata, long elapsedMillis, Long addedSize) {
+    private void backupCompleted(UserLogger ulog, SnapshotId snapshot, SnapshotMetadata metadata, long elapsedMillis,
+                                 Long addedSize, long totalBefore) {
         if (ulog.getPlayerName() != null) mod().onManualBackupCompleted();
         if (!getConfig().getBoolean(BROADCAST_DONE_ENABLED)) return;
         final String elapsed = BackupCompletion.elapsedText(elapsedMillis);
@@ -515,14 +538,8 @@ class RepoImpl implements Repo {
                 syslog().debug(unavailable);
             }
         }
-        if (usesSize(template, "total_size")) {
-            try {
-                totalSize = sizeOfDirectory(getDirectory());
-            } catch (Exception unavailable) {
-                Executor.checkCancelled();
-                syslog().warn("Unable to calculate total backup size.");
-                syslog().debug(unavailable);
-            }
+        if (usesSize(template, "total_size") || usesSize(template, "changed_size")) {
+            totalSize = totalBackupSize();
         }
         Executor.checkCancelled();
         final UserMessage message;
@@ -541,7 +558,8 @@ class RepoImpl implements Repo {
                     "snapshot_size", snapshotSize,
                     "current_size", snapshotSize,
                     "total_size", totalSize,
-                    "added_size", addedSize == null ? -1 : addedSize), BROADCAST);
+                    "added_size", addedSize == null ? -1 : addedSize,
+                    "changed_size", totalBefore < 0 || totalSize < 0 ? Long.MIN_VALUE : totalSize - totalBefore), BROADCAST);
         }
         mod().sendBroadcast(message);
     }

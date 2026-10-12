@@ -133,6 +133,9 @@ abstract class PruneUtils {
         for (final SnapshotId sid : toPrune) {
             deleteSnapshotsFn.accept(sid);
         }
+        syslog().info("Pruned " + toPrune.size() + " " +
+                (policyConfigKey == LOCAL_RETENTION_POLICY ? "local" : "remote") +
+                " snapshot(s) according to " + policyConfigKey.getSettingName() + " [" + policyConfig + "].");
         return toPrune;
     }
 }

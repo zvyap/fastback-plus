@@ -54,7 +54,7 @@ public class UserMessageUtil {
 
     private static final Map<String, String> DEFAULT_TRANSLATIONS = loadDefaultTranslations();
     private static final Pattern HEX_COLOR = Pattern.compile("#[a-fA-F0-9]{6}");
-    private static final Pattern SIZE_TOKEN = Pattern.compile("((?:current|snapshot|total|added)_size)(?::([0-9]))?");
+    private static final Pattern SIZE_TOKEN = Pattern.compile("((?:current|snapshot|total|added|changed)_size)(?::([0-9]))?");
     private static final String[] SIZE_UNITS = {"bytes", "KB", "MB", "GB", "TB", "PB", "EB"};
 
     public static Component messageToText(final UserMessage m) {
@@ -103,7 +103,9 @@ public class UserMessageUtil {
             }
             if (size != null) {
                 final int precision = sizeToken.group(2) == null ? 0 : Integer.parseInt(sizeToken.group(2));
-                text.append(Component.literal(formatSize(size, precision)).setStyle(style));
+                final String formatted = "changed_size".equals(sizeToken.group(1))
+                        ? formatSizeChange(size, precision) : formatSize(size, precision);
+                text.append(Component.literal(formatted).setStyle(style));
             } else if (values.containsKey(token)) {
                 text.append(Component.literal(values.get(token)).setStyle(style));
             } else if (HEX_COLOR.matcher(token).matches()) {
@@ -149,6 +151,12 @@ public class UserMessageUtil {
         }
         return BigDecimal.valueOf(bytes).divide(BigDecimal.valueOf(divisor), precision, RoundingMode.HALF_UP)
                 .toPlainString() + SIZE_UNITS[unit];
+    }
+
+    /** Signed storage delta; Long.MIN_VALUE marks an unavailable measurement, outside the range of valid deltas. */
+    public static String formatSizeChange(long bytes, int precision) {
+        if (bytes == Long.MIN_VALUE) return formatSize(-1, precision);
+        return (bytes < 0 ? "-" : "+") + formatSize(Math.abs(bytes), precision);
     }
 
     private static Style messageStyle(UserMessage.UserMessageStyle style) {

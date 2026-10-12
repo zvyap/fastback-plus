@@ -105,13 +105,29 @@ class AutosaveListener implements Runnable {
                 config.isSet(SERVER_EMPTY_WAIT_MINUTES) || config.isSet(SERVER_EMPTY_MAX));
         final SchedulableAction action = forConfigValue(config,
                 emptyPolicy && config.isSet(SERVER_EMPTY_ACTION) ? SERVER_EMPTY_ACTION : AUTOBACK_ACTION);
-        if (action == null || action == NONE) return;
+        if (action == null || action == NONE) {
+            if (emptyPolicy && "none".equals(config.getString(SERVER_EMPTY_ACTION)) &&
+                    this.serverEmpty.updateStopReason(emptyPeriod, "backup-server-empty-action=none")) {
+                syslog().info("Auto-backup stopped because no players are online (backup-server-empty-action=none).");
+            }
+            return;
+        }
         final int waitMinutes = config.getInt(emptyPolicy && config.isSet(SERVER_EMPTY_WAIT_MINUTES)
                 ? SERVER_EMPTY_WAIT_MINUTES : AUTOBACK_WAIT_MINUTES);
         final long now = this.clock.getAsLong();
         if (emptyPolicy) {
-            if (!this.serverEmpty.isDue(emptyPeriod, now, waitMinutes, config.getInt(SERVER_EMPTY_MAX))) return;
+            final int max = config.getInt(SERVER_EMPTY_MAX);
+            if (this.serverEmpty.isLimitReached(emptyPeriod, max)) {
+                final String reason = "backup-server-empty-max=" + max + " reached";
+                if (this.serverEmpty.updateStopReason(emptyPeriod, reason)) {
+                    syslog().info("Auto-backup stopped because no players are online (" + reason + ").");
+                }
+                return;
+            }
+            this.serverEmpty.updateStopReason(emptyPeriod, null);
+            if (!this.serverEmpty.isDue(emptyPeriod, now, waitMinutes, max)) return;
         } else {
+            this.serverEmpty.updateStopReason(emptyPeriod, null);
             final Duration timeRemaining = Duration.ofMinutes(waitMinutes)
                     .minus(Duration.ofNanos(now - this.lastBackupTime));
             if (!timeRemaining.isZero() && !timeRemaining.isNegative()) {

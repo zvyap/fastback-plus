@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.37.0+26.3.0 - 2026-10-12
+
+For Minecraft 26.3, with Fabric and NeoForge builds. Requires Java 25.
+
+### Added
+
+- Optional `{changed_size}` reports the signed change in total local backup
+  storage during a backup, such as `+50MB` or `-120MB`. Decimal precision is
+  supported with `{changed_size:2}`; unavailable measurements display `-`.
+- Empty-server automatic-backup stop reasons are logged to the console when
+  backups are disabled or their configured limit is reached. Repeated autosaves
+  do not repeat the same stop message.
+- Local and remote pruning log the number of deleted snapshots, including zero,
+  and the retention policy used.
+
+### Improved
+
+- All size displays omit the space between the number and unit, such as
+  `228.00MB` and `5.00GB`.
+- `/backup remote-prune` reports an unset retention policy without throwing an
+  error while trying to display a deleted count.
+
+[Full changelog](https://github.com/zvyap/fastback-plus/compare/0.36.0%2B26.3.0...0.37.0%2B26.3.0)
+
 ## 0.36.0+26.3.0 - 2026-10-09
 
 For Minecraft 26.3, with Fabric and NeoForge builds. Requires Java 25.
@@ -7,7 +31,7 @@ For Minecraft 26.3, with Fabric and NeoForge builds. Requires Java 25.
 ### Added
 
 - Backup completion notices now include newly stored local Git LFS bytes:
-  `Backup completed. Used 5 seconds (228.00MB / 5.00GB) [+140MB].`
+  `Backup completed. Used 5 seconds (228.00 MB / 5.00 GB) [+140 MB].`
   Shared or reused LFS content adds zero bytes; unavailable statistics do not fail
   a completed backup.
 - Size placeholders support decimal precision, such as `{current_size:2}` and
@@ -23,8 +47,7 @@ For Minecraft 26.3, with Fabric and NeoForge builds. Requires Java 25.
   including the empty-server wait, without consuming or resetting its backup
   limit. Failed or cancelled backups leave the scheduling wait unchanged.
 - Completion size formatting preserves message colors and styles, and supports
-  the existing translated notices and English fallback for older clients. All
-  size displays omit the space between the number and unit.
+  the existing translated notices and English fallback for older clients.
 
 [Full changelog](https://github.com/zvyap/fastback-plus/compare/0.35.2%2B26.3.0...0.36.0%2B26.3.0)
 

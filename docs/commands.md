@@ -62,7 +62,7 @@ notice with `/backup set broadcast-done-enabled false`. To customize it:
 /backup set broadcast-done-message Backup completed. Used {elapsed} ({current_size:2} / {total_size:2}) [+{added_size}].
 ```
 
-Supported placeholders are `{elapsed}`, `{snapshot}`, `{current_size}`, `{snapshot_size}`, `{total_size}`, `{added_size}`,
+Supported placeholders are `{elapsed}`, `{snapshot}`, `{current_size}`, `{snapshot_size}`, `{total_size}`, `{added_size}`, `{changed_size}`,
 `{creator}`, and `{remark}`. Elapsed time is the backup duration, including any
 remote push, expressed in words; it excludes the subsequent size lookup.
 Snapshot size is the logical size of the committed
@@ -78,8 +78,19 @@ Content already in the LFS store is shared and adds zero bytes. A backup without
 new LFS objects displays `+0bytes`. A failed lookup displays `[-]` in the default
 notice. Custom `lfs.storage` locations are respected.
 
+`changed_size` is the signed change in total local Git repository storage from
+just before the backup to its successful completion, including any remote push.
+It includes ordinary Git files and objects as well as LFS objects stored inside
+the repository. Growth displays `+50MB`, shrinkage displays `-120MB`, and no
+change displays `+0bytes`. Unavailable measurements display `-`. Pruning or
+garbage collection performed after the completion notice is excluded. To show it:
+
+```text
+/backup set broadcast-done-message Backup completed. Used {elapsed} ({current_size:2} / {total_size:2}) [+{added_size}] [{changed_size}].
+```
+
 Size placeholders accept a decimal precision from 0 to 9, for example
-`{current_size:2}`, `{total_size:2}`, or `{added_size:1}`. Units are selected
+`{current_size:2}`, `{total_size:2}`, `{added_size:1}`, or `{changed_size:2}`. Units are selected
 automatically using 1024 bytes per KB, MB, GB, and so on, with no space before
 the unit in any size display. The default notice uses
 two decimals for current and total size and whole units for added size. Plain
