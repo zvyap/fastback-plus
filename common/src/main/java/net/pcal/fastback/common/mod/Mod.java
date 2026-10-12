@@ -21,11 +21,13 @@ package net.pcal.fastback.common.mod;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
+import net.pcal.fastback.common.config.ActionRule;
 import net.pcal.fastback.common.logging.UserMessage;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Objects.requireNonNull;
@@ -110,6 +112,9 @@ public interface Mod {
 
     /** Refresh the automatic-backup wait after a successful player backup. */
     void onManualBackupCompleted();
+
+    /** Apply command changes immediately without resetting unchanged actions' clocks or counters. */
+    void onActionsChanged(List<ActionRule> actions);
 
     /**
      * Called from the shutdown message screen mixins to render additional text.

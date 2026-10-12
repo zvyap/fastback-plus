@@ -101,6 +101,12 @@ class GitConfigImpl implements GitConfig {
             return this;
         }
 
+        @Override
+        public Updater unset(GitConfigKey key) {
+            storedConfig.unset(key.getSectionName(), key.getSubSectionName(), key.getSettingName());
+            return this;
+        }
+
         // ======================================================================
         // Methods for adding commented-out settings.  Useful for making the
         // initial git config a little more self-documenting.  jgit evidently

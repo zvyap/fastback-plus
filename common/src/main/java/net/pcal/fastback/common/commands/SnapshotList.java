@@ -31,19 +31,17 @@ final class SnapshotList {
     static Component render(List<SnapshotDetails> entries, int page, int total, boolean remote) {
         final int maxPage = pageCount(total);
         if (page < 1 || page > maxPage) throw new IllegalArgumentException("Invalid backup list page: " + page);
-        final MutableComponent result = messageToText(localized(remote ? "fastback.chat.remote-list-title" : "fastback.chat.list-title", total)).copy()
-                .withStyle(GOLD, BOLD);
-        result.append("\n  ").append(messageToText(localized("fastback.chat.list-columns")).copy()
-                .withStyle(style -> style.withColor(GRAY).withBold(false)));
+        final MutableComponent result = header(remote ? "fastback.chat.remote-list-title" : "fastback.chat.list-title",
+                "fastback.chat.list-columns", total);
         for (final SnapshotDetails details : entries) {
             final String id = details.id().getShortName();
             final Component hover = SnapshotPresentation.details(details, remote).copy()
                     .append("\n\n  ").append(messageToText(localized("fastback.chat.list-copy-hint")).copy().withStyle(GREEN));
             final Component entry = Component.literal("  ").withStyle(DARK_GRAY)
                     .append(Component.literal(id).withStyle(YELLOW))
-                    .append(Component.literal(" | ").withStyle(DARK_GRAY))
+                    .append(separator())
                     .append(SnapshotPresentation.creatorText(details))
-                    .append(Component.literal(" | ").withStyle(DARK_GRAY))
+                    .append(separator())
                     .append(SnapshotPresentation.remarkText(details, remote))
                     .withStyle(style -> style.withBold(false)
                             .withClickEvent(new ClickEvent.CopyToClipboard(id))
@@ -52,6 +50,21 @@ final class SnapshotList {
         }
         if (total == 0) result.append("\n  ").append(messageToText(localized("fastback.chat.list-empty")).copy().withStyle(style -> style.withColor(GRAY).withBold(false)));
         final String command = remote ? "/backup remote-list " : "/backup list ";
+        return footer(result, page, total, command);
+    }
+
+    static MutableComponent header(String titleKey, String columnsKey, int total) {
+        return messageToText(localized(titleKey, total)).copy().withStyle(GOLD, BOLD)
+                .append("\n  ").append(messageToText(localized(columnsKey)).copy()
+                        .withStyle(style -> style.withColor(GRAY).withBold(false)));
+    }
+
+    static Component separator() {
+        return Component.literal(" | ").withStyle(DARK_GRAY);
+    }
+
+    static Component footer(MutableComponent result, int page, int total, String command) {
+        final int maxPage = pageCount(total);
         return result.append("\n  ")
                 .append(navigation("fastback.chat.list-previous", command, page - 1, page > 1))
                 .append(" ")

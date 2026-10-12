@@ -18,21 +18,35 @@
 
 package net.pcal.fastback.common.commands;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
 import net.pcal.fastback.common.logging.UserLogger;
 import net.pcal.fastback.common.logging.UserMessage;
+import net.pcal.fastback.common.repo.SnapshotDetails;
 import net.pcal.fastback.common.repo.SnapshotId;
+import net.pcal.fastback.common.repo.SnapshotListings;
 
 import java.util.List;
 
+import static net.minecraft.ChatFormatting.GOLD;
+import static net.minecraft.ChatFormatting.GRAY;
+import static net.minecraft.ChatFormatting.RED;
 import static net.minecraft.commands.Commands.literal;
 import static net.pcal.fastback.common.commands.Commands.SUCCESS;
 import static net.pcal.fastback.common.commands.Commands.getArgumentNicely;
 import static net.pcal.fastback.common.commands.Commands.gitOp;
+import static net.pcal.fastback.common.commands.Commands.snapshotOp;
 import static net.pcal.fastback.common.commands.Commands.subcommandPermission;
+import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.ERROR;
+import static net.pcal.fastback.common.logging.UserMessage.localized;
+import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
 import static net.pcal.fastback.common.logging.UserLogger.ulog;
+import static net.pcal.fastback.common.mod.Mod.mod;
+import static net.pcal.fastback.common.mod.UserMessageUtil.messageToText;
 import static net.pcal.fastback.common.utils.Executor.ExecutionLock.WRITE;
 
 enum DeleteCommand implements Command {
@@ -47,9 +61,42 @@ enum DeleteCommand implements Command {
         argb.then(literal(COMMAND_NAME).
                 requires(subcommandPermission(COMMAND_NAME, pf)).then(
                         SnapshotArgument.local(ARGUMENT).
-                                executes(DeleteCommand::delete)
+                                executes(context -> confirm(context, false))
+                                .then(ConfirmationArgument.hidden(DeleteCommand::delete))
                 )
         );
+    }
+
+    static int confirm(CommandContext<CommandSourceStack> context, boolean remote) {
+        final UserLogger log = ulog(context);
+        final CommandSourceStack source = context.getSource();
+        final String snapshot = StringArgumentType.getString(context, ARGUMENT);
+        snapshotOp(SnapshotListings.details(mod().getWorldDirectory(), remote, snapshot), log, details -> {
+            if (details == null) {
+                source.getServer().execute(() -> log.message(styledLocalized("fastback.chat.restore-nosuch", ERROR, snapshot)));
+                return;
+            }
+            final Component text = confirmation(details, remote);
+            source.getServer().execute(() -> {
+                if (source.getServer().isRunning()) source.sendSuccess(() -> text, false);
+            });
+        });
+        return SUCCESS;
+    }
+
+    static Component confirmation(SnapshotDetails details, boolean remote) {
+        final String confirmCommand = "/backup " + (remote ? "remote-delete" : "delete") + " "
+                + StringArgumentType.escapeIfRequired(details.id().getShortName()) + " confirm";
+        final Component button = messageToText(localized("fastback.chat.delete-confirm-button")).copy()
+                .withStyle(style -> style.withColor(RED).withBold(true).withUnderlined(true)
+                        .withClickEvent(new ClickEvent.RunCommand(confirmCommand)));
+        return Component.empty().append(messageToText(localized("fastback.chat.delete-confirm",
+                        messageToText(localized(remote ? "fastback.values.remote" : "fastback.values.local")))).copy()
+                        .withStyle(GOLD).withStyle(style -> style.withBold(true)))
+                .append("\n").append(SnapshotPresentation.details(details, remote))
+                .append("\n  ").append(messageToText(localized("fastback.chat.delete-warning")).copy().withStyle(RED))
+                .append("\n  ").append(button).append("  ")
+                .append(messageToText(localized("fastback.chat.delete-cancel-hint")).copy().withStyle(GRAY));
     }
 
     private static int delete(final CommandContext<CommandSourceStack> cc) {

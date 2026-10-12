@@ -114,8 +114,9 @@ enum HelpCommand implements Command {
                 if (subcommand.equals(available)) {
                     final String prefix = "/backup " + subcommand + ": ";
                     ulog.message(UserMessage.localized("fastback.help.command." + subcommand, prefix));
-                    if ("set".equals(subcommand) && cc.getSource().getServer().isDedicatedServer()) {
-                        ulog.message(UserMessage.localized("fastback.help.server-empty-settings"));
+                    if ("action".equals(subcommand)) {
+                        ulog.message(UserMessage.localized(cc.getSource().getServer().isDedicatedServer()
+                                ? "fastback.help.action-events-server" : "fastback.help.action-events-singleplayer"));
                     }
                     return SUCCESS;
                 }
@@ -127,7 +128,8 @@ enum HelpCommand implements Command {
 
     private static List<String> getSubcommandNames(CommandContext<CommandSourceStack> cc) {
         final List<String> out = new ArrayList<>();
-        cc.getNodes().get(0).getNode().getChildren().forEach(node -> out.add(node.getName()));
+        cc.getNodes().get(0).getNode().getChildren().stream().filter(node -> node.canUse(cc.getSource()))
+                .forEach(node -> out.add(node.getName()));
         return out;
     }
 }

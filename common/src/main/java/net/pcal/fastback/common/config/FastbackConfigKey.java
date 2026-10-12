@@ -25,6 +25,9 @@ package net.pcal.fastback.common.config;
  */
 public enum FastbackConfigKey implements GitConfigKey {
 
+    ACTIONS("actions", null),
+
+    // Legacy automation keys are retained only for migrating existing worlds.
     AUTOBACK_ACTION("autoback-action", null),
     AUTOBACK_WAIT_MINUTES("autoback-wait", 0),
     BROADCAST_ENABLED("broadcast-enabled", true),

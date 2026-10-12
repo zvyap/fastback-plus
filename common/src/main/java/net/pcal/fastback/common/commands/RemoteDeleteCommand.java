@@ -44,7 +44,8 @@ enum RemoteDeleteCommand implements Command {
         argb.then(literal(COMMAND_NAME).
                 requires(subcommandPermission(COMMAND_NAME, pf)).then(
                         SnapshotArgument.remote(ARGUMENT).
-                                executes(RemoteDeleteCommand::delete)
+                                executes(context -> DeleteCommand.confirm(context, true))
+                                .then(ConfirmationArgument.hidden(RemoteDeleteCommand::delete))
                 )
         );
     }

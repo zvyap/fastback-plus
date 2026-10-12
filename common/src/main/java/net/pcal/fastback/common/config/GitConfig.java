@@ -56,6 +56,8 @@ public interface GitConfig {
 
         Updater set(GitConfigKey key, int newValue);
 
+        Updater unset(GitConfigKey key);
+
         Updater setCommented(GitConfigKey key, boolean newValue);
 
         Updater setCommented(GitConfigKey key, String newValue);

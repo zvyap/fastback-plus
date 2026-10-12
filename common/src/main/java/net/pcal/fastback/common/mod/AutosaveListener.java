@@ -18,7 +18,8 @@
 
 package net.pcal.fastback.common.mod;
 
-import net.pcal.fastback.common.commands.SchedulableAction;
+import net.pcal.fastback.common.config.ActionConfig;
+import net.pcal.fastback.common.config.ActionRule;
 import net.pcal.fastback.common.config.GitConfig;
 import net.pcal.fastback.common.logging.UserLogger;
 import net.pcal.fastback.common.repo.Repo;
@@ -26,18 +27,13 @@ import net.pcal.fastback.common.repo.RepoFactory;
 import net.pcal.fastback.common.utils.Executor;
 
 import java.nio.file.Path;
-import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
-import static net.pcal.fastback.common.commands.SchedulableAction.NONE;
-import static net.pcal.fastback.common.commands.SchedulableAction.forConfigValue;
-import static net.pcal.fastback.common.config.FastbackConfigKey.AUTOBACK_ACTION;
-import static net.pcal.fastback.common.config.FastbackConfigKey.AUTOBACK_WAIT_MINUTES;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_BACKUP_ENABLED;
-import static net.pcal.fastback.common.config.FastbackConfigKey.SERVER_EMPTY_ACTION;
-import static net.pcal.fastback.common.config.FastbackConfigKey.SERVER_EMPTY_MAX;
-import static net.pcal.fastback.common.config.FastbackConfigKey.SERVER_EMPTY_WAIT_MINUTES;
 import static net.pcal.fastback.common.logging.SystemLogger.syslog;
 import static net.pcal.fastback.common.mod.Mod.mod;
 import static net.pcal.fastback.common.utils.Executor.executor;
@@ -50,32 +46,48 @@ import static net.pcal.fastback.common.utils.Executor.executor;
  */
 class AutosaveListener implements Runnable {
 
-    private final ServerEmptyBackupState serverEmpty = new ServerEmptyBackupState();
+    private final ActionSchedule schedule = new ActionSchedule();
     private final LongSupplier clock;
-    private volatile long lastBackupTime;
+    private final Supplier<LocalDateTime> wallClock;
 
     AutosaveListener() {
-        this(System::nanoTime);
+        this(System::nanoTime, LocalDateTime::now);
     }
 
     AutosaveListener(LongSupplier clock) {
+        this(clock, LocalDateTime::now);
+    }
+
+    AutosaveListener(LongSupplier clock, Supplier<LocalDateTime> wallClock) {
         this.clock = requireNonNull(clock);
+        this.wallClock = requireNonNull(wallClock);
         reset(false);
     }
 
     void reset(boolean empty) {
-        this.lastBackupTime = this.clock.getAsLong();
-        this.serverEmpty.reset(empty, this.lastBackupTime);
+        this.schedule.reset(empty, this.clock.getAsLong(), this.wallClock.get());
     }
 
     void onServerPlayersChanged(boolean empty) {
-        this.serverEmpty.update(empty, this.clock.getAsLong());
+        this.schedule.playersChanged(empty, this.clock.getAsLong());
     }
 
     void onManualBackupCompleted() {
-        final long now = this.clock.getAsLong();
-        this.lastBackupTime = now;
-        this.serverEmpty.refreshWait(now);
+        this.schedule.manualBackupCompleted(this.clock.getAsLong());
+    }
+
+    void onActionsChanged(List<ActionRule> rules) {
+        this.schedule.actionsChanged(rules, this.clock.getAsLong(), this.wallClock.get());
+    }
+
+    void initializeActions() {
+        final Path world = mod().getWorldDirectory();
+        if (!RepoFactory.rf().isGitRepo(world)) return;
+        try (final Repo repo = RepoFactory.rf().load(world)) {
+            this.schedule.sync(ActionConfig.loadAndMigrate(repo.getConfig()), this.clock.getAsLong(), this.wallClock.get());
+        } catch (Exception e) {
+            syslog().error("Could not migrate automatic backup actions. Existing configuration was retained.", e);
+        }
     }
 
     @Override
@@ -99,52 +111,26 @@ class AutosaveListener implements Runnable {
 
     void backupIfDue(Repo repo, UserLogger ulog) throws Exception {
         final GitConfig config = repo.getConfig();
+        final List<ActionRule> rules = ActionConfig.loadAndMigrate(config);
         if (!config.getBoolean(IS_BACKUP_ENABLED)) return;
-        final long emptyPeriod = this.serverEmpty.period();
-        final boolean emptyPolicy = emptyPeriod >= 0 && (config.isSet(SERVER_EMPTY_ACTION) ||
-                config.isSet(SERVER_EMPTY_WAIT_MINUTES) || config.isSet(SERVER_EMPTY_MAX));
-        final SchedulableAction action = forConfigValue(config,
-                emptyPolicy && config.isSet(SERVER_EMPTY_ACTION) ? SERVER_EMPTY_ACTION : AUTOBACK_ACTION);
-        if (action == null || action == NONE) {
-            if (emptyPolicy && "none".equals(config.getString(SERVER_EMPTY_ACTION)) &&
-                    this.serverEmpty.updateStopReason(emptyPeriod, "backup-server-empty-action=none")) {
-                syslog().info("Auto-backup stopped because no players are online (backup-server-empty-action=none).");
-            }
-            return;
-        }
-        final int waitMinutes = config.getInt(emptyPolicy && config.isSet(SERVER_EMPTY_WAIT_MINUTES)
-                ? SERVER_EMPTY_WAIT_MINUTES : AUTOBACK_WAIT_MINUTES);
         final long now = this.clock.getAsLong();
-        if (emptyPolicy) {
-            final int max = config.getInt(SERVER_EMPTY_MAX);
-            if (this.serverEmpty.isLimitReached(emptyPeriod, max)) {
-                final String reason = "backup-server-empty-max=" + max + " reached";
-                if (this.serverEmpty.updateStopReason(emptyPeriod, reason)) {
-                    syslog().info("Auto-backup stopped because no players are online (" + reason + ").");
-                }
-                return;
-            }
-            this.serverEmpty.updateStopReason(emptyPeriod, null);
-            if (!this.serverEmpty.isDue(emptyPeriod, now, waitMinutes, max)) return;
-        } else {
-            this.serverEmpty.updateStopReason(emptyPeriod, null);
-            final Duration timeRemaining = Duration.ofMinutes(waitMinutes)
-                    .minus(Duration.ofNanos(now - this.lastBackupTime));
-            if (!timeRemaining.isZero() && !timeRemaining.isNegative()) {
-                syslog().debug("Skipping auto-backup until at least " +
-                        (timeRemaining.toSeconds() / 60) + " more minutes have elapsed.");
-                return;
+        final LocalDateTime wallTime = this.wallClock.get();
+        this.schedule.sync(rules, now, wallTime);
+        final long occupancy = this.schedule.occupancy();
+        for (final ActionRule rule : rules) {
+            // Occupancy can change while the worker reads the configuration or runs an earlier action.
+            if (!this.schedule.isDue(rule, occupancy, this.clock.getAsLong(), this.wallClock.get())) continue;
+            Executor.checkCancelled();
+            syslog().info("Starting automatic action " + rule.eventArgument() + " " + rule.action().getArgumentName());
+            try {
+                final boolean success = rule.action().getTask(repo, ulog).call();
+                Executor.checkCancelled();
+                this.schedule.completed(rule, occupancy, this.clock.getAsLong(), this.wallClock.get(), success);
+            } catch (Exception e) {
+                Executor.checkCancelled();
+                syslog().error("Automatic action failed: " + rule.eventArgument() + " " + rule.action().getArgumentName(), e);
             }
         }
-        // A player event may have changed the policy while this worker was checking configuration.
-        if (this.serverEmpty.period() != emptyPeriod) return;
-        Executor.checkCancelled();
-        syslog().info("Starting auto-backup" + (emptyPolicy ? " for empty server" : ""));
-        final boolean success = action.getTask(repo, ulog).call();
-        Executor.checkCancelled();
-        final long completed = this.clock.getAsLong();
-        if (success || !emptyPolicy) this.lastBackupTime = completed;
-        this.serverEmpty.completed(emptyPeriod, completed, success);
     }
 
 }

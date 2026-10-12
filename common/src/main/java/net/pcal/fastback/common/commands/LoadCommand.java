@@ -49,7 +49,7 @@ enum LoadCommand implements Command {
                 .requires(subcommandPermission(commandName, pf).and(source -> source.getServer().isDedicatedServer()))
                 .then((remote ? SnapshotArgument.remote("snapshot") : SnapshotArgument.local("snapshot"))
                         .executes(this::confirm)
-                        .then(literal("confirm").executes(this::load))));
+                        .then(ConfirmationArgument.hidden(this::load))));
     }
 
     private int confirm(CommandContext<CommandSourceStack> context) {

@@ -22,7 +22,8 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.pcal.fastback.common.commands.Commands;
-import net.pcal.fastback.common.commands.SchedulableAction;
+import net.pcal.fastback.common.config.ActionConfig;
+import net.pcal.fastback.common.config.ActionRule;
 import net.pcal.fastback.common.config.GitConfig;
 import net.pcal.fastback.common.logging.Log4jLogger;
 import net.pcal.fastback.common.logging.SystemLogger;
@@ -41,13 +42,13 @@ import org.eclipse.jgit.transport.SshSessionFactory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static java.nio.file.Files.createTempDirectory;
 import static java.util.Objects.requireNonNull;
 import static net.pcal.fastback.common.config.FastbackConfigKey.IS_BACKUP_ENABLED;
-import static net.pcal.fastback.common.config.FastbackConfigKey.SHUTDOWN_ACTION;
 import static net.pcal.fastback.common.logging.SystemLogger.syslog;
 import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.ERROR;
 import static net.pcal.fastback.common.logging.UserMessage.localized;
@@ -106,6 +107,7 @@ class ModImpl implements Mod {
         this.autoSaveListener.reset(minecraftServer.isDedicatedServer());
         SnapshotCache.clear();
         executor().start();
+        this.autoSaveListener.initializeActions();
         syslog().debug("onWorldStart complete");
     }
 
@@ -123,12 +125,18 @@ class ModImpl implements Mod {
             if (restore == null && rf.isGitRepo(worldSaveDir)) {
                 try (final Repo repo = rf.load(worldSaveDir)) {
                     final GitConfig config = repo.getConfig();
+                    final List<ActionRule> rules = ActionConfig.loadAndMigrate(config);
                     if (config.getBoolean(IS_BACKUP_ENABLED)) {
-                        final SchedulableAction action = SchedulableAction.forConfigValue(config, SHUTDOWN_ACTION);
-                        if (action != null) {
+                        for (final ActionRule rule : rules) {
+                            if (rule.event() != ActionRule.Event.SHUTDOWN) continue;
                             this.setMessageScreenText(localized("fastback.message.backing-up"));
-                            action.getTask(repo, ulog).call();
-                            this.setMessageScreenText(localized("fastback.chat.backup-complete"));
+                            try {
+                                if (rule.action().getTask(repo, ulog).call()) {
+                                    this.setMessageScreenText(localized("fastback.chat.backup-complete"));
+                                }
+                            } catch (Exception e) {
+                                syslog().error("Shutdown action failed: " + rule.action().getArgumentName(), e);
+                            }
                         }
                     }
                 } catch (Exception e) {
@@ -343,6 +351,11 @@ class ModImpl implements Mod {
     @Override
     public void onManualBackupCompleted() {
         this.autoSaveListener.onManualBackupCompleted();
+    }
+
+    @Override
+    public void onActionsChanged(List<ActionRule> actions) {
+        this.autoSaveListener.onActionsChanged(actions);
     }
 
     @Override

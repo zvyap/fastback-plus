@@ -34,9 +34,7 @@ import net.pcal.fastback.common.retention.RetentionPolicyCodec;
 import net.pcal.fastback.common.retention.RetentionPolicyType;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static net.minecraft.commands.Commands.argument;
@@ -46,8 +44,6 @@ import static net.pcal.fastback.common.commands.Commands.SUCCESS;
 import static net.pcal.fastback.common.commands.Commands.getArgumentNicely;
 import static net.pcal.fastback.common.commands.Commands.missingArgument;
 import static net.pcal.fastback.common.commands.Commands.subcommandPermission;
-import static net.pcal.fastback.common.config.FastbackConfigKey.AUTOBACK_ACTION;
-import static net.pcal.fastback.common.config.FastbackConfigKey.AUTOBACK_WAIT_MINUTES;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_MESSAGE;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_DONE_ENABLED;
@@ -59,10 +55,6 @@ import static net.pcal.fastback.common.config.FastbackConfigKey.LOCAL_RETENTION_
 import static net.pcal.fastback.common.config.FastbackConfigKey.LOAD_COUNTDOWN_SECONDS;
 import static net.pcal.fastback.common.config.FastbackConfigKey.REMOTE_RETENTION_POLICY;
 import static net.pcal.fastback.common.config.FastbackConfigKey.RESTORE_DIRECTORY;
-import static net.pcal.fastback.common.config.FastbackConfigKey.SERVER_EMPTY_ACTION;
-import static net.pcal.fastback.common.config.FastbackConfigKey.SERVER_EMPTY_MAX;
-import static net.pcal.fastback.common.config.FastbackConfigKey.SERVER_EMPTY_WAIT_MINUTES;
-import static net.pcal.fastback.common.config.FastbackConfigKey.SHUTDOWN_ACTION;
 import static net.pcal.fastback.common.config.OtherConfigKey.REMOTE_PUSH_URL;
 import static net.pcal.fastback.common.logging.SystemLogger.syslog;
 import static net.pcal.fastback.common.logging.UserLogger.ulog;
@@ -100,28 +92,9 @@ enum SetCommand implements Command {
         registerStringConfigValue(BROADCAST_DONE_MESSAGE, "message", sc);
         registerStringConfigValue(RESTORE_DIRECTORY, "full-directory-path", sc);
         registerStringConfigValue(REMOTE_PUSH_URL, "url", sc);
-        registerIntegerConfigValue(AUTOBACK_WAIT_MINUTES, "minutes", sc);
-        sc.then(literal(SERVER_EMPTY_WAIT_MINUTES.getDisplayName())
-                .requires(source -> source.getServer().isDedicatedServer())
-                .then(argument("minutes", IntegerArgumentType.integer(0))
-                        .executes(cc -> setIntegerConfigValue(SERVER_EMPTY_WAIT_MINUTES, "minutes", cc))));
-        sc.then(literal(SERVER_EMPTY_MAX.getDisplayName())
-                .requires(source -> source.getServer().isDedicatedServer())
-                .then(argument("count", IntegerArgumentType.integer(0))
-                        .executes(cc -> setIntegerConfigValue(SERVER_EMPTY_MAX, "count", cc))));
         sc.then(literal(LOAD_COUNTDOWN_SECONDS.getDisplayName())
                 .then(argument("seconds", IntegerArgumentType.integer(0))
                         .executes(cc -> setIntegerConfigValue(LOAD_COUNTDOWN_SECONDS, "seconds", cc))));
-
-        {
-            final List<String> schedulableActions = new ArrayList<>();
-            for (final SchedulableAction sa : SchedulableAction.values()) {
-                schedulableActions.add(sa.getConfigValue());
-            }
-            registerSelectConfigValue(AUTOBACK_ACTION, schedulableActions, sc);
-            registerSelectConfigValue(SERVER_EMPTY_ACTION, schedulableActions, sc);
-            registerSelectConfigValue(SHUTDOWN_ACTION, schedulableActions, sc);
-        }
 
         registerSetRetentionCommand(LOCAL_RETENTION_POLICY, sc);
         registerSetRetentionCommand(REMOTE_RETENTION_POLICY, sc);
@@ -167,13 +140,6 @@ enum SetCommand implements Command {
     // ======================================================================
     // Integer config values
 
-    private static void registerIntegerConfigValue(final GitConfigKey key, final String argName, final LiteralArgumentBuilder<CommandSourceStack> setCommand) {
-        final LiteralArgumentBuilder<CommandSourceStack> builder = literal(key.getDisplayName());
-        builder.then(argument(argName, IntegerArgumentType.integer()).
-                executes(cc -> setIntegerConfigValue(key, argName, cc)));
-        setCommand.then(builder);
-    }
-
     private static int setIntegerConfigValue(final GitConfigKey key, final String argName, final CommandContext<CommandSourceStack> cc) {
         try (UserLogger ulog = ulog(cc)) {
             final Path worldSaveDir = mod().getWorldDirectory();
@@ -209,34 +175,6 @@ enum SetCommand implements Command {
             if (rf.isGitRepo(worldSaveDir)) {
                 try (Repo repo = rf.load(worldSaveDir)) {
                     final String newValue = cc.getArgument(argName, String.class);
-                    repo.getConfig().updater().set(key, newValue).save();
-                    ulog.message(raw(key.getDisplayName() + " = " + newValue));
-                } catch (Exception e) {
-                    ulog.internalError(e);
-                    return FAILURE;
-                }
-            }
-        }
-        return SUCCESS;
-    }
-
-    // ======================================================================
-    // Selection config values
-
-    private static void registerSelectConfigValue(GitConfigKey key, List<String> selections, final LiteralArgumentBuilder<CommandSourceStack> setCommand) {
-        final LiteralArgumentBuilder<CommandSourceStack> builder = literal(key.getDisplayName())
-                .requires(source -> key != SERVER_EMPTY_ACTION || source.getServer().isDedicatedServer());
-        for (final String selection : selections) {
-            builder.then(literal(selection).executes(cc -> setSelectionConfigValue(key, selection, cc)));
-        }
-        setCommand.then(builder);
-    }
-
-    private static int setSelectionConfigValue(final GitConfigKey key, final String newValue, final CommandContext<CommandSourceStack> cc) {
-        try (UserLogger ulog = ulog(cc)) {
-            final Path worldSaveDir = mod().getWorldDirectory();
-            if (rf().isGitRepo(worldSaveDir)) {
-                try (final Repo repo = rf().load(worldSaveDir)) {
                     repo.getConfig().updater().set(key, newValue).save();
                     ulog.message(raw(key.getDisplayName() + " = " + newValue));
                 } catch (Exception e) {

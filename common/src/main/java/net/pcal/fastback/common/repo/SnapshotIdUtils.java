@@ -52,8 +52,7 @@ abstract class SnapshotIdUtils {
             private static final String SEP = "/";
 
             @Override
-            SnapshotId create(final WorldId wid) {
-                final Date date = new Date();
+            SnapshotId create(final WorldId wid, final Date date) {
                 final String shortName = THREAD_DATE_FORMAT.get().format(date);
                 return new SnapshotIdImpl(wid, date, shortName, getBranchName(wid, shortName));
             }
@@ -92,8 +91,7 @@ abstract class SnapshotIdUtils {
             private static final String SEP = "/";
 
             @Override
-            SnapshotId create(WorldId wid) {
-                final Date date = new Date();
+            SnapshotId create(final WorldId wid, final Date date) {
                 final String shortName = THREAD_DATE_FORMAT.get().format(date);
                 return new SnapshotIdImpl(wid, date, shortName, getBranchName(wid, shortName));
             }
@@ -135,7 +133,11 @@ abstract class SnapshotIdUtils {
         // Preserve the server timezone and parsing behaviour while isolating concurrent Git readers.
         private static final ThreadLocal<DateFormat> THREAD_DATE_FORMAT = ThreadLocal.withInitial(() -> (DateFormat) DATE_FORMAT.clone());
 
-        abstract SnapshotId create(WorldId wid);
+        SnapshotId create(WorldId wid) {
+            return create(wid, new Date());
+        }
+
+        abstract SnapshotId create(WorldId wid, Date date);
 
         abstract SnapshotId create(WorldId worldId, String shortName) throws ParseException;
 

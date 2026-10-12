@@ -9,26 +9,23 @@
 | `restore`                         | Restore a backup snapshot.                                                               |
 | `load <snapshot>`                 | Show a local snapshot's details and a clickable confirmation; loads and restarts the dedicated server after a countdown. |
 | `cancel`                          | Cancel an ongoing backup or snapshot load before the server starts stopping.             |
-| `delete`                          | Delete an individual snapshot.                                                           |
+| `delete <snapshot>`              | Show a local snapshot and confirm before deleting it. The `confirm` flag is hidden from completion. |
 | `info`                            | Info about current backup state and settings.                                            |
 | `list [page]`                     | List local snapshots, newest first, eight per page. Click arrows to change pages or an entry to copy its backup ID. |
 | `push`    _NEW_!                  | Push a snapshot to the remote.                                                           |
 | `prune`                           | Delete old snapshots according to the retention policy.                                  |
 | `gc`                              | Run garbage collection to free up disk space.                                            |
 | `create-file-remote`              | Create a remote backup target on the file system.                                        |
-| `remote-delete`                   | Delete a remote snapshot.                                                                |
+| `remote-delete <snapshot>`       | Show a remote snapshot and confirm before deleting it. The `confirm` flag is hidden from completion. |
 | `remote-list [page]`              | List remote snapshots with the same pagination, metadata, and copy actions as `list`.    |
 | `remote-prune`                    | Delete old snapshots from the remote backup according to the remote retention policy.    |
 | `remote-restore`                  | Restore a remote snapshot.                                                               |
 | `remote-load <snapshot>`          | Show a remote snapshot's details and a clickable confirmation; loads and restarts the dedicated server after a countdown. |
 | `set retention-policy`            | Set retention policy for local snapshots.                                                |
 | `set remote-url`                  | Set the url for remote backups.                                                          |
-| `set shutdown-action`             | Set an action to perform on shutdown.                                                    |
-| `set autoback-action`             | Set an action to perform during auto-backups.                                            |
-| `set autoback-wait`               | Set the minimum number of minutes to wait between auto-backups.                          |
-| `set backup-server-empty-action <action>` | Dedicated servers only: action while no players are connected (`none`, `local`, `full`, `full-gc`). `none` skips scheduled backups while empty. |
-| `set backup-server-empty-wait <minutes>` | Dedicated servers only: minimum minutes after becoming empty and between empty-server backups. Accepts 0 or greater. |
-| `set backup-server-empty-max <count>` | Dedicated servers only: maximum successful scheduled backups per continuous empty period. `0` means unlimited; accepts 0 or greater. |
+| `action add <EVENT> <ACTION> [MAX]` | Add an automatic action. Events: `SHUTDOWN`, `EMPTY`, `INTERVAL[30m]`, `SCHEDULED[00:00]`; actions: `local`, `full`, `full-gc`, `push`. `MAX` defaults to `0` (unlimited); `SHUTDOWN` does not accept it. |
+| `action list [page]`              | List automatic actions using the backup-list layout. Click a row to review removal. |
+| `action remove <EVENT> <ACTION>`  | Confirm removal of a rule using its plain event name and action. |
 | `set load-countdown-seconds <seconds>` | Set the snapshot-load countdown, in seconds. Defaults to 10; accepts 0 or greater.   |
 | `set restore-directory`           | Target directory for restored snapshots.  Useful for servers with limited tmp space.     |
 | `set remote-retention-policy`     | Set retention policy for remote snapshots.                                               |

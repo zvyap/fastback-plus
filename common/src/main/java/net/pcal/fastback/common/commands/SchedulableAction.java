@@ -35,17 +35,17 @@ import static java.util.Objects.requireNonNull;
  */
 public enum SchedulableAction {
 
-    NONE("none") {
-        @Override
-        public Callable<Boolean> getTask(final Repo repo, final UserLogger ulog) {
-            return () -> false;
-        }
-    },
-
     LOCAL("local") {
         @Override
         public Callable<Boolean> getTask(final Repo repo, final UserLogger ulog) {
             return () -> repo.doCommitSnapshot(ulog);
+        }
+    },
+
+    PUSH("push") {
+        @Override
+        public Callable<Boolean> getTask(final Repo repo, final UserLogger ulog) {
+            return () -> repo.doPushLatest(ulog);
         }
     },
 
@@ -78,7 +78,7 @@ public enum SchedulableAction {
         if (configValue == null) return null;
         for (SchedulableAction action : SchedulableAction.values()) {
             if (action.configValue.equals(configValue)) {
-                return action == SchedulableAction.NONE ? null : action;
+                return action;
             }
         }
         return null;

@@ -40,6 +40,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,9 +73,8 @@ abstract class CommitUtils {
     static SnapshotId doCommitSnapshot(final RepoImpl repo, final UserLogger ulog, final SnapshotMetadata metadata) throws IOException, ProcessException, GitAPIException {
         Executor.checkCancelled();
         PreflightUtils.doPreflight(repo);
-        final WorldId uuid = repo.getWorldId();
         final GitConfig conf = repo.getConfig();
-        final SnapshotId newSid = repo.getSidCodec().create(uuid);
+        final SnapshotId newSid = createAvailableSnapshotId(repo, new Date());
         syslog().debug("start doCommitSnapshot for " + newSid);
         writeBackupProperties(repo);
 
@@ -102,6 +102,19 @@ abstract class CommitUtils {
         Executor.checkCancelled();
         syslog().debug("Local backup complete.");
         return newSid;
+    }
+
+    /** Called under the WRITE lock; preserve existing snapshots when multiple actions share a second. */
+    static SnapshotId createAvailableSnapshotId(final RepoImpl repo, final Date timestamp) throws IOException {
+        final SnapshotIdUtils.SnapshotIdCodec codec = repo.getSidCodec();
+        final WorldId worldId = repo.getWorldId();
+        SnapshotId candidate = codec.create(worldId, timestamp);
+        while (true) {
+            Executor.checkCancelled();
+            if (repo.getJGit().getRepository().exactRef("refs/heads/" + candidate.getBranchName()) == null) return candidate;
+            // Keep the existing second-resolution name format by taking the next unused second.
+            candidate = codec.create(worldId, Date.from(candidate.getDate().toInstant().plusSeconds(1)));
+        }
     }
 
     private static void doSettingsBackup(RepoImpl repo, UserLogger ulog) {

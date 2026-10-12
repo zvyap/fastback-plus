@@ -20,6 +20,8 @@ package net.pcal.fastback.common.commands;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
+import net.pcal.fastback.common.config.ActionConfig;
+import net.pcal.fastback.common.config.ActionRule;
 import net.pcal.fastback.common.config.GitConfig;
 import net.pcal.fastback.common.config.GitConfigKey;
 import net.pcal.fastback.common.logging.UserLogger;
@@ -29,6 +31,7 @@ import net.pcal.fastback.common.retention.RetentionPolicy;
 import net.pcal.fastback.common.retention.RetentionPolicyCodec;
 import net.pcal.fastback.common.retention.RetentionPolicyType;
 
+import java.util.List;
 import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
@@ -36,8 +39,6 @@ import static net.minecraft.commands.Commands.literal;
 import static net.pcal.fastback.common.commands.Commands.FAILURE;
 import static net.pcal.fastback.common.commands.Commands.SUCCESS;
 import static net.pcal.fastback.common.commands.Commands.subcommandPermission;
-import static net.pcal.fastback.common.config.FastbackConfigKey.AUTOBACK_ACTION;
-import static net.pcal.fastback.common.config.FastbackConfigKey.AUTOBACK_WAIT_MINUTES;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_ENABLED;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_MESSAGE;
 import static net.pcal.fastback.common.config.FastbackConfigKey.BROADCAST_DONE_ENABLED;
@@ -48,10 +49,6 @@ import static net.pcal.fastback.common.config.FastbackConfigKey.LOCAL_RETENTION_
 import static net.pcal.fastback.common.config.FastbackConfigKey.LOAD_COUNTDOWN_SECONDS;
 import static net.pcal.fastback.common.config.FastbackConfigKey.REMOTE_RETENTION_POLICY;
 import static net.pcal.fastback.common.config.FastbackConfigKey.RESTORE_DIRECTORY;
-import static net.pcal.fastback.common.config.FastbackConfigKey.SERVER_EMPTY_ACTION;
-import static net.pcal.fastback.common.config.FastbackConfigKey.SERVER_EMPTY_MAX;
-import static net.pcal.fastback.common.config.FastbackConfigKey.SERVER_EMPTY_WAIT_MINUTES;
-import static net.pcal.fastback.common.config.FastbackConfigKey.SHUTDOWN_ACTION;
 import static net.pcal.fastback.common.config.OtherConfigKey.REMOTE_PUSH_URL;
 import static net.pcal.fastback.common.logging.UserLogger.ulog;
 import static net.pcal.fastback.common.logging.UserMessage.raw;
@@ -101,24 +98,15 @@ enum InfoCommand implements Command {
                         show(REMOTE_PUSH_URL, conf::getString, ulog);
                         show(RESTORE_DIRECTORY, conf::getString, ulog);
                         show(LOAD_COUNTDOWN_SECONDS, conf::getInt, ulog);
-                        show(AUTOBACK_WAIT_MINUTES, conf::getInt, ulog);
                         show(IS_MODS_BACKUP_ENABLED, conf::getBoolean, ulog);
                         show(BROADCAST_ENABLED, conf::getBoolean, ulog);
                         show(BROADCAST_MESSAGE, conf::getString, ulog);
                         show(BROADCAST_DONE_ENABLED, conf::getBoolean, ulog);
                         show(BROADCAST_DONE_MESSAGE, conf::getString, ulog);
 
-                        final SchedulableAction shutdownAction = SchedulableAction.forConfigValue(conf.getString(SHUTDOWN_ACTION));
-                        ulog.message(UserMessage.localized("fastback.chat.info-shutdown-action", getActionDisplay(shutdownAction)));
-                        final SchedulableAction autobackAction = SchedulableAction.forConfigValue(conf.getString(AUTOBACK_ACTION));
-                        ulog.message(UserMessage.localized("fastback.chat.info-autoback-action", getActionDisplay(autobackAction)));
-                        if (scs.getServer().isDedicatedServer()) {
-                            show(SERVER_EMPTY_ACTION, key -> getActionDisplay(SchedulableAction.forConfigValue(conf,
-                                    conf.isSet(key) ? SERVER_EMPTY_ACTION : AUTOBACK_ACTION)), ulog);
-                            show(SERVER_EMPTY_WAIT_MINUTES, key -> conf.getInt(
-                                    conf.isSet(key) ? SERVER_EMPTY_WAIT_MINUTES : AUTOBACK_WAIT_MINUTES), ulog);
-                            show(SERVER_EMPTY_MAX, conf::getInt, ulog);
-                        }
+                        final List<ActionRule> actions = ActionConfig.load(conf);
+                        ulog.message(UserMessage.localized("fastback.chat.info-actions", actions.size()));
+                        for (final ActionRule action : actions) ulog.message(raw("  " + ActionCommand.description(action)));
 
                         showRetentionPolicy(ulog,
                                 conf.getString(LOCAL_RETENTION_POLICY),
@@ -141,10 +129,6 @@ enum InfoCommand implements Command {
 
     private static void show(GitConfigKey key, Function<GitConfigKey, Object> valueFn, UserLogger ulog) {
         ulog.message(raw(key.getDisplayName() + " = " + valueFn.apply(key)));
-    }
-
-    private static String getActionDisplay(SchedulableAction action) {
-        return action == null ? SchedulableAction.NONE.getArgumentName() : action.getArgumentName();
     }
 
     private static void showRetentionPolicy(UserLogger log, String encodedPolicy, String setKey, String noneKey) {

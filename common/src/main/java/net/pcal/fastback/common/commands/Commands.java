@@ -94,6 +94,7 @@ public class Commands {
         RemoteRestoreCommand.INSTANCE.register(root, pf);
 
         SetCommand.INSTANCE.register(root, pf);
+        ActionCommand.INSTANCE.register(root, pf);
 
         HelpCommand.INSTANCE.register(root, pf);
         return root;
@@ -168,20 +169,24 @@ public class Commands {
     }
 
     static void gitOp(final ExecutionLock lock, final UserLogger ulog, final GitOp op) {
+        gitOp(lock, ulog, true, op);
+    }
+
+    static void gitOp(final ExecutionLock lock, final UserLogger ulog, final boolean checkEnabled, final GitOp op) {
         try {
             executor().execute(lock, ulog, () -> {
                 final Path worldSaveDir = mod().getWorldDirectory();
                 final RepoFactory rf = RepoFactory.rf();
                 if (!rf.isGitRepo(worldSaveDir)) { // FIXME this is not the right place for these checks
                     // If they haven't yet run 'backup init', make sure they've installed native.
-                    if (!isNativeOk(true, ulog, true)) return;
+                    if (checkEnabled && !isNativeOk(true, ulog, true)) return;
                     ulog.message(styledLocalized("fastback.chat.not-enabled", ERROR));
                     return;
                 }
                 try (final Repo repo = rf.load(worldSaveDir)) {
                     final GitConfig repoConfig = repo.getConfig();
-                    if (!isNativeOk(repoConfig, ulog, false)) return;
-                    if (!repoConfig.getBoolean(IS_BACKUP_ENABLED)) {
+                    if (checkEnabled && !isNativeOk(repoConfig, ulog, false)) return;
+                    if (checkEnabled && !repoConfig.getBoolean(IS_BACKUP_ENABLED)) {
                         ulog.message(styledLocalized("fastback.chat.not-enabled", ERROR));
                     } else {
                         op.execute(repo);

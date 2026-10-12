@@ -178,27 +178,37 @@ class RepoImpl implements Repo {
     }
 
     @Override
-    public void doPushSnapshot(SnapshotId sid, final UserLogger ulog) {
+    public boolean doPushSnapshot(SnapshotId sid, final UserLogger ulog) {
         if (!this.getConfig().isSet(REMOTE_PUSH_URL)) {
             ulog.message(styledLocalized("fastback.chat.remote-no-url", ERROR));
-            return;
+            return false;
         }
-        if (!isNativeOk(this.getConfig(), ulog, false)) return;
+        if (!isNativeOk(this.getConfig(), ulog, false)) return false;
         final long start = System.nanoTime();
         try {
             PushUtils.doPush(sid, this, ulog);
         } catch (IOException | ProcessException e) {
             Executor.checkCancelled();
-            ulog.message(styledLocalized("fastback.chat.commit-failed", ERROR));
+            ulog.message(styledLocalized("fastback.chat.push-failed", ERROR));
             syslog().error(e);
-            return;
+            return false;
         } finally {
             invalidateSnapshots();
         }
         Executor.checkCancelled();
         ulog.message(UserMessage.localized("fastback.chat.push-done-elapsed", sid.getShortName(), getDuration(start)));
+        return true;
     }
 
+    @Override
+    public boolean doPushLatest(final UserLogger ulog) throws IOException {
+        final SnapshotId latest = getLocalSnapshots().stream().max(Comparator.naturalOrder()).orElse(null);
+        if (latest == null) {
+            ulog.message(styledRaw("No local snapshot is available to push.", ERROR));
+            return false;
+        }
+        return doPushSnapshot(latest, ulog);
+    }
 
     @Override
     public Collection<SnapshotId> doLocalPrune(final UserLogger ulog) throws IOException {

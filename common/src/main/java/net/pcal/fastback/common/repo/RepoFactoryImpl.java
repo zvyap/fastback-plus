@@ -18,6 +18,7 @@
 
 package net.pcal.fastback.common.repo;
 
+import net.pcal.fastback.common.config.ActionConfig;
 import net.pcal.fastback.common.config.GitConfig.Updater;
 import net.pcal.fastback.common.logging.UserLogger;
 import org.eclipse.jgit.api.Git;
@@ -36,6 +37,7 @@ import static net.pcal.fastback.common.logging.UserMessage.UserMessageStyle.WARN
 import static net.pcal.fastback.common.logging.UserMessage.raw;
 import static net.pcal.fastback.common.logging.UserMessage.styledLocalized;
 import static net.pcal.fastback.common.logging.UserMessage.styledRaw;
+import static net.pcal.fastback.common.mod.Mod.mod;
 import static net.pcal.fastback.common.repo.WorldIdUtils.createWorldId;
 import static net.pcal.fastback.common.repo.WorldIdUtils.ensureWorldHasId;
 import static net.pcal.fastback.common.utils.EnvironmentUtils.isNativeOk;
@@ -74,7 +76,8 @@ class RepoFactoryImpl implements RepoFactory {
                 config.setString("user", null, "name", worldId);
                 config.setString("user", null, "email", worldId + "@fastback");
             }
-            updater.save();
+            ActionConfig.save(repo.getConfig(), ActionConfig.defaults());
+            mod().onActionsChanged(ActionConfig.defaults());
             ulog.message(raw("Backups initialized.  Run '/backup local' to do your first backup.  '/backup help' for more options."));
         } catch (GitAPIException e) {
             syslog().error("Error initializing repo", e);

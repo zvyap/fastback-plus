@@ -90,7 +90,9 @@ public interface Repo extends AutoCloseable {
 
     void doGc(UserLogger ulog);
 
-    void doPushSnapshot(SnapshotId sid, UserLogger ulog);
+    boolean doPushSnapshot(SnapshotId sid, UserLogger ulog);
+
+    boolean doPushLatest(UserLogger ulog) throws IOException;
 
     void deleteRemoteBranch(String remoteBranchName) throws IOException;
 
