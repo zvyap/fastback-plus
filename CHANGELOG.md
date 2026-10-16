@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.38.0 - 2026-10-17
+
+For Minecraft 26.3, with Fabric and NeoForge builds. Requires Java 25.
+
+### Added
+
+- Configurable backup actions managed with `/backup action add <EVENT> <ACTION> [MAX]`,
+  `/backup action list [page]`, and `/backup action remove <EVENT> <ACTION>`.
+- Supported events: `SHUTDOWN` (world or dedicated server shutdown), `EMPTY`
+  (dedicated server without connected players), `INTERVAL[duration]` (such as
+  `INTERVAL[30m]`), and `SCHEDULED[HH:MM]` (daily at server-local time).
+- Optional `MAX` execution limits for action rules per session.
+- Two-step confirmation for removing action rules.
+- Automatic migration of legacy shutdown, autoback, and empty-server scheduling
+  settings to action rules.
+- Dedicated permission nodes for action commands: `fastback.command.action`,
+  `fastback.command.action.add`, `fastback.command.action.list`, and
+  `fastback.command.action.remove`.
+
+### Improved
+
+- `/backup info` summarizes effective configured actions.
+
+[Full changelog](https://github.com/zvyap/fastback-plus/compare/0.37.0%2B26.3.0...0.38.0)
+
 ## 0.37.0+26.3.0 - 2026-10-12
 
 For Minecraft 26.3, with Fabric and NeoForge builds. Requires Java 25.
