@@ -175,8 +175,8 @@ tasks.register('buildReleaseJars') {
 		}
 
 		println "✓ Built release jars:"
-		println "  - fabric/build/libs/${archivesBaseNameFabric}-${releaseVersion}.jar"
-		println "  - neoforge/build/libs/${archivesBaseNameNeoForge}-${releaseVersion}.jar"
+		println "  - fabric/build/libs/${archivesBaseNameFabric}-${releaseVersion}+${minecraft_version}.jar"
+		println "  - neoforge/build/libs/${archivesBaseNameNeoForge}-${releaseVersion}+${minecraft_version}.jar"
 	}
 }
 
@@ -202,8 +202,8 @@ tasks.register('publishGitHub') {
 		println "Creating GitHub release ${releaseVersion}..."
 		def currentBranch = 'git branch --show-current'.execute().text.trim()
 
-		def fabricJar = file("fabric/build/libs/${archivesBaseNameFabric}-${releaseVersion}.jar")
-		def neoforgeJar = file("neoforge/build/libs/${archivesBaseNameNeoForge}-${releaseVersion}.jar")
+		def fabricJar = file("fabric/build/libs/${archivesBaseNameFabric}-${releaseVersion}+${minecraft_version}.jar")
+		def neoforgeJar = file("neoforge/build/libs/${archivesBaseNameNeoForge}-${releaseVersion}+${minecraft_version}.jar")
 
 		if (!fabricJar.exists()) throw new GradleException("Fabric release jar not found at ${fabricJar}")
 		if (!neoforgeJar.exists()) throw new GradleException("NeoForge release jar not found at ${neoforgeJar}")
