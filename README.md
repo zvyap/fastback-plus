@@ -9,6 +9,29 @@ of disk space.
 
 ![](https://pcal43.github.io/fastback/savescreen_animation.gif)
 
+## Supported Minecraft versions
+
+| Minecraft | Fabric | NeoForge | Java |
+|-----------|--------|----------|------|
+| 26.1.2 | Yes | Yes | 25 |
+| 26.2 | Yes | Yes | 25 |
+| 26.3 | Yes | Yes | 25 |
+
+These targets pass builds and existing automated tests. Live in-game
+backup and restore validation is pending.
+
+Use the JAR matching both your Minecraft version and mod loader. New releases
+built from these sources bundle all six JARs, named like
+`fastback-fabric-<mod-version>+26.2.jar`, under one release version without a
+Minecraft suffix. Existing releases retain their original artifacts. Older 26.1
+patches and future 26.x releases are not covered by this table. Supporting multiple
+Minecraft versions does not make worlds interchangeable between those versions.
+
+Build a target with Java 25 and `./gradlew ciBuild -Pminecraft_version=26.2`
+(PowerShell: `.\gradlew.bat ciBuild '-Pminecraft_version=26.2'`). The default target
+is 26.3. Each loader's JAR is written to `<loader>/build/<minecraft-version>/libs/`.
+The dependency pins for supported targets are in `gradle/minecraft-versions.json`.
+
 ## Features
 
 * Incrementally backup just the changed files

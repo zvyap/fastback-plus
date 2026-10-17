@@ -9,8 +9,33 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  targets:
     runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.targets.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify release version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version=$(sed -n 's/^mod_version *= *//p' gradle.properties | tr -d '\r')
+          [[ "$RELEASE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$RELEASE_TAG" = "$version"
+      - id: targets
+        run: echo "versions=$(jq -c 'keys' gradle/minecraft-versions.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: targets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        minecraft: ${{ fromJSON(needs.targets.outputs.versions) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,14 +47,33 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: true
-      - name: Verify release version
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
+      - name: Prepare deterministic test clock
         run: |
-          version=$(sed -n 's/^mod_version *= *//p' gradle.properties | tr -d '\r')
-          test "$RELEASE_TAG" = "$version"
+          sudo apt-get update -qq
+          sudo apt-get install -y libfaketime
+          echo "FASTBACK_TEST_CLOCK=@$(date -u +%F) 12:00:00" >> "$GITHUB_ENV"
       - name: Test and build release JARs
-        run: ./gradlew ciBuild --console=plain
+        run: ./gradlew clean ciBuild -Pminecraft_version=${{ matrix.minecraft }} --console=plain
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fastback-${{ matrix.minecraft }}
+          if-no-files-found: error
+          path: |
+            fabric/build/${{ matrix.minecraft }}/libs/fastback-fabric-${{ github.ref_name }}+${{ matrix.minecraft }}.jar
+            neoforge/build/${{ matrix.minecraft }}/libs/fastback-neoforge-${{ github.ref_name }}+${{ matrix.minecraft }}.jar
+
+  release:
+    needs: [targets, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fastback-*
+          merge-multiple: true
+          path: release-artifacts
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -41,9 +85,15 @@ jobs:
             found { print }
           ' CHANGELOG.md > release-notes.md
           test -s release-notes.md
-          mc_version=$(sed -n 's/^minecraft_version *= *//p' gradle.properties | tr -d '\r')
-          gh release create "$RELEASE_TAG" \
-            "fabric/build/libs/fastback-fabric-${RELEASE_TAG}+${mc_version}.jar" \
-            "neoforge/build/libs/fastback-neoforge-${RELEASE_TAG}+${mc_version}.jar" \
+          assets=()
+          while IFS= read -r mc_version; do
+            for loader in fabric neoforge; do
+              jar="release-artifacts/${loader}/build/${mc_version}/libs/fastback-${loader}-${RELEASE_TAG}+${mc_version}.jar"
+              test -s "$jar"
+              assets+=("$jar")
+            done
+          done < <(jq -r 'keys[]' gradle/minecraft-versions.json)
+          test "$(find release-artifacts -type f -name '*.jar' | wc -l)" -eq "${#assets[@]}"
+          gh release create "$RELEASE_TAG" "${assets[@]}" \
             --verify-tag --title "$RELEASE_TAG" --generate-notes \
             --notes-file release-notes.md

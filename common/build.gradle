@@ -41,6 +41,17 @@ loom {
 	runs {}
 }
 
+sourceSets.main.java.srcDir(rootProject.ext.commonClientSources)
+
 test {
 	useJUnitPlatform()
+	testLogging { exceptionFormat = 'full' }
+	// shortcut: the legacy daily-retention fixture needs UTC noon; remove when its date arithmetic is fixed.
+	def testClock = providers.environmentVariable('FASTBACK_TEST_CLOCK').orNull
+	if (testClock != null) {
+		systemProperty 'user.timezone', 'UTC'
+		environment 'LD_PRELOAD', '/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1'
+		environment 'FAKETIME', testClock
+		environment 'FAKETIME_DONT_FAKE_MONOTONIC', '1'
+	}
 }

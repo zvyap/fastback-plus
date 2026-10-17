@@ -1,0 +1,17 @@
+{
+  "26.1.2": {
+    "fabric_api_version": "0.155.3+26.1.2",
+    "neoforge_version": "26.1.2.122",
+    "server_translations_version": "3.0.3+26.1"
+  },
+  "26.2": {
+    "fabric_api_version": "0.161.0+26.2",
+    "neoforge_version": "26.2.0.93",
+    "server_translations_version": "3.1.0+26.2"
+  },
+  "26.3": {
+    "fabric_api_version": "0.161.0+26.3",
+    "neoforge_version": "26.3.0.16-beta",
+    "server_translations_version": "3.2.0+26.3"
+  }
+}

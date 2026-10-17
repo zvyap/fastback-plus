@@ -1,45 +1,50 @@
-name: build-pull-request
+name: build
 
-on: [ pull_request ]
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  targets:
     runs-on: ubuntu-latest
-
+    outputs:
+      versions: ${{ steps.targets.outputs.versions }}
     steps:
       - uses: actions/checkout@v4
-      # this is consistently timing out on github, not sure why
-      # - uses: gradle/actions/wrapper-validation@v3
+      - id: targets
+        run: echo "versions=$(jq -c 'keys' gradle/minecraft-versions.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: targets
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        minecraft: ${{ fromJSON(needs.targets.outputs.versions) }}
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 25
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          # Releases are not published with github actions, so I'm less concerned about cache poisoning
-          cache-read-only: false
-
-      # Aggressively cache Gradle home and build dirs
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v4
+          cache-read-only: true
+      - name: Prepare deterministic test clock
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libfaketime
+          echo "FASTBACK_TEST_CLOCK=@$(date -u +%F) 12:00:00" >> "$GITHUB_ENV"
+      - name: Test and build both loaders
+        run: ./gradlew clean ciBuild -Pminecraft_version=${{ matrix.minecraft }} --console=plain
+      - uses: actions/upload-artifact@v4
         with:
+          name: fastback-${{ matrix.minecraft }}
+          if-no-files-found: error
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Cache build outputs
-        uses: actions/cache@v4
-        with:
-          path: |
-            **/build
-          key: ${{ runner.os }}-build-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-build-
-
-      - name: Execute Gradle build
-        run: ./gradlew clean ciBuild --console=plain
+            fabric/build/${{ matrix.minecraft }}/libs/fastback-fabric-*+${{ matrix.minecraft }}.jar
+            neoforge/build/${{ matrix.minecraft }}/libs/fastback-neoforge-*+${{ matrix.minecraft }}.jar
