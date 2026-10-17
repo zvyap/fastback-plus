@@ -116,3 +116,62 @@ message's default style. Unknown tokens remain literal text. For example:
 
 The completion placeholders above can be combined with formatting tokens;
 placeholder values such as remarks remain literal text.
+
+## Partial rollback (dedicated servers)
+
+```text
+/backup rollback <snapshot> region <dimension-id> <block-x> <block-y> <block-z>
+/backup rollback <snapshot> chunk <dimension-id> <block-x> <block-y> <block-z>
+/backup rollback <snapshot> dimension <dimension-id>
+/backup rollback <snapshot> player <username>
+```
+
+Select a local snapshot, then a scope. Dimension IDs and online/cached offline
+usernames have tab completion. XYZ input selects the region or chunk containing
+that block position. It accepts absolute coordinates and Minecraft's relative
+coordinates, such as `~ ~ ~`. Y is accepted as part of the position; rollback
+always affects the full vertical column. Negative coordinates use floor division.
+For example, `region minecraft:overworld -1 64 0` selects region file
+`r.-1.0.mca`: chunks X=-32..-1, Z=0..31 and blocks X=-512..-1, Z=0..511.
+`chunk minecraft:overworld -1 64 0` selects just chunk (-1, 0), blocks
+X=-16..-1, Z=0..15. The earlier two-number X/Z syntax remains available and
+interprets its numbers as region or chunk indexes, respectively.
+
+The preview shows snapshot metadata, the dimension and region, and inclusive
+chunk and block ranges. Dimension rollback confirms that the whole dimension
+is affected. Player rollback shows the username and UUID; the confirmation
+button pins that UUID even if the player disconnects or the command source moves.
+Offline identity lookup reads the server's existing in-memory username cache,
+case-insensitively; it makes no network requests and never guesses a UUID for
+unknown names. Online identities take precedence over cached identities.
+Player rollback restores inventory,
+position and other player NBT, advancements and statistics for that UUID only.
+The UUID in the button is an internal confirmation parameter.
+
+Click **Confirm rollback** to start preparation and the configured
+`load-countdown-seconds` countdown. `/backup cancel` works until shutdown begins.
+The server stops cleanly, makes a mandatory safety snapshot, builds the new
+world from the final saved world, applies only the selected snapshot data, and
+uses the normal world swap and automatic restart. The previous world remains
+in the recovery directory logged by the server. This requires room for both an
+extracted snapshot and a copy of the current world, in addition to backup storage.
+Legacy migrations can also require temporary space for Minecraft's conversion.
+
+Region and chunk rollback include terrain, entities and points of interest,
+including oversized external chunk files. Chunk rollback preserves neighboring
+chunks in the same region. Missing entity/POI data and optional player files
+are removed within the selection to match the snapshot. A missing terrain
+region, terrain chunk, dimension or required player data fails before shutdown.
+Before selecting files, partial rollback uses the running Minecraft version's
+native file migrations on the disposable snapshot extraction. This handles
+legacy Overworld/`DIM-1`/`DIM1`, custom dimensions, player folders and namespaced
+dimension data, as well as the newer `dimensions/...` and `players/...` layout.
+The live world and original backup are untouched during migration. Snapshot
+data versions newer than the running game, or missing version metadata, are
+rejected before shutdown; downgrades are not attempted.
+
+Dimension rollback replaces that dimension's entire directory, including its
+saved dimension data. Other dimensions, players and shared world data such as
+scoreboards remain current. Partial rollback does not reconcile entities or
+items moved across the selection boundary since the snapshot, or external mod
+databases. Automatic restart has the same hosting-panel limitations as `load`.

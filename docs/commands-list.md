@@ -8,6 +8,10 @@
 | `view <backup-id>`                | View a local snapshot's ID, server-local date and time, creator, and remark.              |
 | `restore`                         | Restore a backup snapshot.                                                               |
 | `load <snapshot>`                 | Show a local snapshot's details and a clickable confirmation; loads and restarts the dedicated server after a countdown. |
+| `rollback <snapshot> region <dimension> <x> <y> <z>` | Select a region by block position (supports `~`); confirmation shows inclusive chunk/block ranges. Two-number X/Z input still uses region indexes. |
+| `rollback <snapshot> chunk <dimension> <x> <y> <z>` | Select a chunk by block position (supports `~`); confirmation shows its region and inclusive block range. Two-number X/Z input still uses chunk indexes. |
+| `rollback <snapshot> dimension <dimension>` | Roll back the entire dimension, including its saved dimension data. |
+| `rollback <snapshot> player <username>` | Select an online or cached offline player; confirmation pins their UUID and restores player data, advancements and statistics. |
 | `cancel`                          | Cancel an ongoing backup or snapshot load before the server starts stopping.             |
 | `delete <snapshot>`              | Show a local snapshot and confirm before deleting it. The `confirm` flag is hidden from completion. |
 | `info`                            | Info about current backup state and settings.                                            |

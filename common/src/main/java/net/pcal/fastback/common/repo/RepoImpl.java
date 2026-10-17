@@ -19,6 +19,7 @@
 package net.pcal.fastback.common.repo;
 
 import net.minecraft.network.chat.Component;
+import net.pcal.fastback.common.utils.RollbackTarget;
 import net.pcal.fastback.common.config.GitConfig;
 import net.pcal.fastback.common.logging.UserLogger;
 import net.pcal.fastback.common.logging.UserMessage;
@@ -255,9 +256,9 @@ class RepoImpl implements Repo {
     }
 
     @Override
-    public void doLoadSnapshot(String snapshotName, boolean remote, UserLogger ulog) {
+    public void doLoadSnapshot(String snapshotName, boolean remote, RollbackTarget target, UserLogger ulog) {
         try {
-            RestoreUtils.doLoadSnapshot(snapshotName, remote, this, ulog);
+            RestoreUtils.doLoadSnapshot(snapshotName, remote, target, this, ulog);
         } finally {
             invalidateSnapshots();
         }

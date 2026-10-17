@@ -23,5 +23,6 @@
 * `fastback.command.remote-prune`
 * `fastback.command.remote-restore`
 * `fastback.command.restore`
+* `fastback.command.rollback`
 * `fastback.command.set`
 * `fastback.command.view`

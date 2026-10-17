@@ -70,6 +70,7 @@ public class Commands {
         RestoreCommand.INSTANCE.register(root, pf);
         LoadCommand.LOCAL.register(root, pf);
         LoadCommand.REMOTE.register(root, pf);
+        RollbackCommand.INSTANCE.register(root, pf);
         root.then(literal("cancel")
                 .requires(subcommandPermission("cancel", pf))
                 .executes(context -> {

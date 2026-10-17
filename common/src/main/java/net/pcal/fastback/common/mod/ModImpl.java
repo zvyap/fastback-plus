@@ -36,6 +36,7 @@ import net.pcal.fastback.common.repo.RepoFactory;
 import net.pcal.fastback.common.repo.SnapshotCache;
 import net.pcal.fastback.common.utils.ServerRestart;
 import net.pcal.fastback.common.utils.ServerWorldRestore;
+import net.pcal.fastback.common.utils.RollbackTarget;
 import org.apache.logging.log4j.LogManager;
 import org.eclipse.jgit.transport.SshSessionFactory;
 
@@ -71,7 +72,7 @@ class ModImpl implements Mod {
     private Path tempRestoresDirectory = null;
     private volatile ServerRestoreRequest pendingRestore = null;
 
-    private record ServerRestoreRequest(Path world, Path staged, Path previous, ServerRestart restart) {
+    private record ServerRestoreRequest(Path world, Path staged, Path previous, ServerRestart restart, RollbackTarget target) {
     }
 
     // ======================================================================
@@ -151,7 +152,13 @@ class ModImpl implements Mod {
                         try (final Repo repo = rf.load(restore.world())) {
                             repo.backupBeforeLoad(ulog);
                         }
-                    }, () -> ServerWorldRestore.install(restore.world(), restore.staged(), restore.previous()),
+                    }, () -> {
+                        if (restore.target() == null) {
+                            ServerWorldRestore.install(restore.world(), restore.staged(), restore.previous());
+                        } else {
+                            restore.target().install(restore.world(), restore.staged(), restore.previous());
+                        }
+                    },
                             restore.restart()::start);
                     syslog().info("Snapshot loaded. Previous world saved at " + restore.previous() +
                             ". The server will restart automatically after this JVM exits.");
@@ -185,7 +192,7 @@ class ModImpl implements Mod {
     }
 
     @Override
-    public synchronized void requestServerRestore(final Path stagedWorld) throws IOException {
+    public synchronized void requestServerRestore(final Path stagedWorld, final RollbackTarget target) throws IOException {
         final MinecraftServer server = this.minecraftServer;
         if (server == null || !server.isDedicatedServer() || !server.isRunning() || this.pendingRestore != null) {
             throw new IOException("Server is unavailable or already loading a snapshot");
@@ -195,7 +202,7 @@ class ModImpl implements Mod {
         final Path previous = world.resolveSibling(world.getFileName() + "-fastback-before-load-" + UUID.randomUUID());
         ServerWorldRestore.validate(world, staged, previous);
         final ServerRestart restart = ServerRestart.prepare();
-        final ServerRestoreRequest restore = new ServerRestoreRequest(world, staged, previous, restart);
+        final ServerRestoreRequest restore = new ServerRestoreRequest(world, staged, previous, restart, target);
         syslog().info("Prepared snapshot at " + staged + ". Outgoing world will be preserved at " + previous);
         boolean committed = false;
         try {

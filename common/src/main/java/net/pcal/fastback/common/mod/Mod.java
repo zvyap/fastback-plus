@@ -19,6 +19,7 @@
 package net.pcal.fastback.common.mod;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.pcal.fastback.common.utils.RollbackTarget;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
 import net.pcal.fastback.common.config.ActionRule;
@@ -131,7 +132,11 @@ public interface Mod {
     Path getDefaultRestoresDir() throws IOException;
 
     /** Stop, back up and install a prepared snapshot, then automatically restart the dedicated server. */
-    void requestServerRestore(Path stagedWorld) throws IOException;
+    default void requestServerRestore(Path stagedWorld) throws IOException {
+        requestServerRestore(stagedWorld, null);
+    }
+
+    void requestServerRestore(Path stagedWorld, RollbackTarget target) throws IOException;
 
     /** Whether the server is stopping to load a prepared snapshot. */
     boolean isServerRestorePending();

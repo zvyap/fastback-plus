@@ -28,6 +28,7 @@ import net.pcal.fastback.common.utils.LoadCountdown;
 import net.pcal.fastback.common.utils.ProcessException;
 import net.pcal.fastback.common.utils.ProcessUtils;
 import net.pcal.fastback.common.utils.ServerWorldRestore;
+import net.pcal.fastback.common.utils.RollbackTarget;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -80,7 +81,8 @@ abstract class RestoreUtils {
         }
     }
 
-    static void doLoadSnapshot(final String snapshotName, final boolean remote, final RepoImpl repo, final UserLogger ulog) {
+    static void doLoadSnapshot(final String snapshotName, final boolean remote, final RollbackTarget target,
+                               final RepoImpl repo, final UserLogger ulog) {
         Path stagedWorld = null;
         boolean scheduled = false;
         try {
@@ -121,10 +123,15 @@ abstract class RestoreUtils {
                 if (!WorldIdUtils.getWorldIdInfo(stagedWorld).wid().equals(repo.getWorldId())) {
                     throw new IOException("Restored snapshot belongs to a different world");
                 }
+                if (target != null) {
+                    target.prepareSnapshot(stagedWorld);
+                    ServerWorldRestore.validateSnapshot(stagedWorld);
+                    target.validateSnapshot(stagedWorld);
+                }
                 prepared.set(true);
                 countdown.await();
             }
-            mod().requestServerRestore(stagedWorld);
+            mod().requestServerRestore(stagedWorld, target);
             scheduled = true;
             checkCancelled();
             ulog.message(localized("fastback.chat.load-scheduled", sid.getShortName()));

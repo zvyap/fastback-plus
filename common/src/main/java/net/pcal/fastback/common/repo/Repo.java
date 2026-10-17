@@ -20,6 +20,7 @@ package net.pcal.fastback.common.repo;
 
 import net.pcal.fastback.common.config.GitConfig;
 import net.pcal.fastback.common.logging.UserLogger;
+import net.pcal.fastback.common.utils.RollbackTarget;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 
@@ -83,7 +84,11 @@ public interface Repo extends AutoCloseable {
 
     void doRestoreRemoteSnapshot(String snapshotName, UserLogger ulog);
 
-    void doLoadSnapshot(String snapshotName, boolean remote, UserLogger ulog);
+    default void doLoadSnapshot(String snapshotName, boolean remote, UserLogger ulog) {
+        doLoadSnapshot(snapshotName, remote, null, ulog);
+    }
+
+    void doLoadSnapshot(String snapshotName, boolean remote, RollbackTarget target, UserLogger ulog);
 
     /** Create the mandatory pre-load snapshot, propagating every backup failure. */
     void backupBeforeLoad(UserLogger ulog) throws Exception;
