@@ -64,6 +64,7 @@ neoForge {
 sourceSets {
     main {
         java { srcDir project(":common").file("src/main/java") }
+        java { srcDir rootProject.ext.commonClientSources }
         resources { srcDir project(":common").file("src/main/resources") }
     }
 }
@@ -71,10 +72,12 @@ sourceSets {
 processResources {
     inputs.property "mod_version", mod_version
     inputs.property "minecraft_version", minecraft_version
+    inputs.property "minecraft_upper_bound", minecraft_upper_bound
     inputs.property "neoforge_version", neoforge_version
     filesMatching("META-INF/neoforge.mods.toml") {
         expand "mod_version": mod_version,
                "minecraft_version": minecraft_version,
+               "minecraft_upper_bound": minecraft_upper_bound,
                "neoforge_version": neoforge_version
     }
 }

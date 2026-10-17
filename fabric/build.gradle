@@ -65,6 +65,7 @@ processResources {
 sourceSets {
 	main {
 		java { srcDir project(":common").file("src/main/java") }
+		java { srcDir rootProject.ext.commonClientSources }
 		resources { srcDir project(":common").file("src/main/resources") }
 	}
 }

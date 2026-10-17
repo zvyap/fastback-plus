@@ -75,7 +75,7 @@ public final class ClientHelper {
 
     public void setMessageScreenText(UserMessage userMessage) {
         if (this.client == null) return;
-        final Screen screen = client.gui.screen();
+        final Screen screen = MinecraftClientScreen.current(client);
         if (screen instanceof GenericMessageScreen) {
             ((ScreenAccessors) screen).setTitle(messageToText(userMessage));
             ((ScreenAccessors) screen).invokeRebuildWidgets(); // force it to rebuild the message component with the new title
