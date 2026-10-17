@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.39.0 - 2026-10-18
+
+For Minecraft 26.1.2, 26.2, and 26.3, with Fabric and NeoForge builds for each
+version. Requires Java 25.
+
+### Added
+
+- Dedicated-server `/backup rollback <snapshot>` commands for a single region,
+  chunk, dimension, or player, with the `fastback.command.rollback` permission.
+- Region and chunk selection using block XYZ coordinates, including relative
+  coordinates, with dimension IDs and negative-coordinate support.
+- Confirmation previews show the affected dimension, region, chunk and block
+  ranges, or the selected player's username and UUID.
+- Player selection supports online usernames and offline usernames from the
+  server's existing profile cache.
+- Scoped restores preserve unrelated world data and use the existing cancellable
+  shutdown, safety backup, and automatic restart flow.
+
+### Improved
+
+- Older snapshot layouts are migrated in staging using Minecraft's native file
+  migration before restoring, including vanilla and nested custom dimensions
+  and player data. Snapshots newer than the running server are rejected.
+- Chunk and region restores include terrain, entities, points of interest, and
+  external chunk data, while preserving neighboring chunks.
+- Region validation accepts valid, unpadded final sectors written by a running
+  server while retaining corruption checks.
+
+[Full changelog](https://github.com/zvyap/fastback-plus/compare/0.38.0...0.39.0)
+
 ## 0.38.0 - 2026-10-17
 
 For Minecraft 26.3, with Fabric and NeoForge builds. Requires Java 25.
